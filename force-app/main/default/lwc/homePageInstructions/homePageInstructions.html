@@ -1,0 +1,52 @@
+<template>
+    <lightning-card title="Guidelines & Instructions" icon-name="custom:custom19" class="instruction-card">
+        
+        <!-- Loading Spinner -->
+        <template if:true={isLoading}>
+            <div class="slds-p-around_large slds-align_absolute-center">
+                <lightning-spinner alternative-text="Loading guidelines..." size="medium"></lightning-spinner>
+            </div>
+        </template>
+
+        <!-- Error State -->
+        <template if:true={error}>
+            <div class="slds-p-around_medium">
+                <div class="slds-notify slds-notify_alert slds-alert_error" role="alert">
+                    <lightning-icon icon-name="utility:error" size="x-small" class="slds-m-right_x-small" variant="inverse"></lightning-icon>
+                    <h2>{error}</h2>
+                </div>
+            </div>
+        </template>
+
+        <!-- Instructions Content -->
+        <template if:false={isLoading}>
+            <div class="slds-p-around_medium instruction-container">
+                <template if:true={hasInstructions}>
+                    <div class="instruction-list">
+                        <template for:each={instructions} for:item="item">
+                            <div key={item.Id} class="instruction-row slds-p-around_small slds-m-bottom_x-small">
+                                <!-- Order Sequence Circle -->
+                                <div class="badge-container">
+                                    <span class="order-badge">{item.ORDER__c}</span>
+                                </div>
+
+                                <!-- Instruction Content -->
+                                <div class="content-container slds-m-left_small">
+                                    <p class="instruction-text">{item.MasterLabel}</p>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+
+                <!-- Empty State (When no instructions apply to current user) -->
+                <template if:false={hasInstructions}>
+                    <div class="slds-text-align_center slds-p-around_large">
+                        <lightning-icon icon-name="utility:info_alt" size="medium" variant="neutral"></lightning-icon>
+                        <p class="slds-m-top_small slds-text-color_weak">No guidelines are available for your role at this time.</p>
+                    </div>
+                </template>
+            </div>
+        </template>
+    </lightning-card>
+</template>

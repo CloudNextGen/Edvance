@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>HR__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>Intruction Visible to HR</description>
+    <fieldManageability>DeveloperControlled</fieldManageability>
+    <label>HR</label>
+    <type>Checkbox</type>
+</CustomField>

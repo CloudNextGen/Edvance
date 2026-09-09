@@ -1,0 +1,68 @@
+{
+  "appPageId" : "6bc70838-1f40-40f7-9d18-4c380517876f",
+  "componentName" : "siteforce:dynamicLayout",
+  "dataProviders" : [ ],
+  "id" : "f9d1c6a9-973e-4a8b-b53b-c565311786ae",
+  "label" : "Learning Documents",
+  "regions" : [ {
+    "components" : [ {
+      "componentAttributes" : {
+        "background" : "background: rgba(0,0,0,0)",
+        "backgroundOverlay" : "rgba(0,0,0,0.5)",
+        "contentAreaWidth" : 100,
+        "sectionConfig" : {
+          "UUID" : "23244b33-0119-4278-a349-f92e805a481c",
+          "columns" : [ {
+            "UUID" : "03f89757-849a-4d6e-8567-e3e607f11221",
+            "columnKey" : "1",
+            "columnName" : "Column 1",
+            "columnWidth" : "12",
+            "seedComponents" : [ ]
+          } ]
+        },
+        "sectionHeight" : 300
+      },
+      "componentName" : "forceCommunity:section",
+      "id" : "23244b33-0119-4278-a349-f92e805a481c",
+      "regions" : [ {
+        "components" : [ {
+          "componentAttributes" : { },
+          "componentName" : "c:learningContentBrowser",
+          "id" : "8096f8c5-6032-4a63-8344-d6ad04beaec3",
+          "renderPriority" : "NEUTRAL",
+          "renditionMap" : { },
+          "type" : "component"
+        } ],
+        "id" : "03f89757-849a-4d6e-8567-e3e607f11221",
+        "regionLabel" : "Column 1",
+        "regionName" : "1",
+        "renditionMap" : { },
+        "type" : "region"
+      } ],
+      "renderPriority" : "NEUTRAL",
+      "renditionMap" : { },
+      "type" : "component"
+    } ],
+    "id" : "c8b3382d-f7cb-4b4a-b159-d7f53f9e681a",
+    "regionName" : "content",
+    "type" : "region"
+  }, {
+    "components" : [ {
+      "componentAttributes" : {
+        "customHeadTags" : "",
+        "description" : "",
+        "title" : "Learning Documents"
+      },
+      "componentName" : "forceCommunity:seoAssistant",
+      "id" : "8c4a81ba-704c-4c6b-a8f5-ea03b209262a",
+      "renditionMap" : { },
+      "type" : "component"
+    } ],
+    "id" : "a84ea266-d06a-4b32-a63a-f504c81e51cb",
+    "regionName" : "sfdcHiddenRegion",
+    "type" : "region"
+  } ],
+  "themeLayoutType" : "Inner",
+  "type" : "view",
+  "viewType" : "custom-learning-documents"
+}

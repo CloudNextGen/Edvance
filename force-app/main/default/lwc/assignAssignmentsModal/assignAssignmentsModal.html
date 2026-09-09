@@ -1,0 +1,112 @@
+<template>
+    <section class="slds-modal slds-fade-in-open" role="dialog">
+        <div class="slds-modal__container">
+            <header class="slds-modal__header">
+                <h2 class="slds-text-heading_medium">Assign Assignments — {userName}</h2>
+                <button class="slds-button slds-button_icon slds-modal__close" onclick={handleClose}>
+                    <lightning-icon icon-name="utility:close" size="small"></lightning-icon>
+                </button>
+            </header>
+
+            <div class="slds-modal__content slds-p-around_medium">
+                <div class="slds-m-bottom_medium">
+                    <lightning-input
+                        type="search"
+                        label="Search assignments"
+                        value={searchTerm}
+                        onchange={handleSearch}>
+                    </lightning-input>
+                </div>
+
+                <template if:true={isLoading}>
+                    <lightning-spinner alternative-text="Loading assignments"></lightning-spinner>
+                </template>
+
+                <template if:true={hasData}>
+                    <template for:each={flatCategoryList} for:item="category">
+                        <div key={category.categoryId} class="slds-m-bottom_small">
+
+                            <div
+                                class="slds-grid slds-grid_vertical-align-center slds-m-bottom_xx-small cursor-pointer"
+                                data-id={category.categoryId}
+                                onclick={handleCategoryToggle}>
+                                <lightning-button-icon
+                                    icon-name={category.iconName}
+                                    variant="bare"
+                                    size="small"
+                                    class="slds-m-right_xx-small">
+                                </lightning-button-icon>
+                                <lightning-icon icon-name="standard:category" size="x-small" class="slds-m-right_xx-small"></lightning-icon>
+                                <span class="slds-text-title_bold">{category.categoryName}</span>
+                            </div>
+
+                            <template if:true={category.isExpanded}>
+                                <template if:true={category.hasAssignments}>
+                                    <template for:each={category.assignments} for:item="asm">
+                                        <div key={asm.assignmentId} class="slds-m-bottom_xx-small slds-m-left_medium">
+                                            <div class="slds-box slds-box_x-small slds-grid slds-grid_vertical-align-center slds-grid_align-spread">
+
+                                                <template if:true={asm.isSelectable}>
+                                                    <lightning-input
+                                                        type="checkbox"
+                                                        label={asm.assignmentName}
+                                                        data-id={asm.assignmentId}
+                                                        checked={asm.selected}
+                                                        onchange={handleAssignmentToggle}>
+                                                    </lightning-input>
+                                                </template>
+
+                                                <template if:false={asm.isSelectable}>
+                                                    <span class="slds-text-body_regular">{asm.assignmentName}</span>
+                                                </template>
+
+                                                <div class="slds-grid slds-grid_vertical-align-center">
+                                                    <span class="slds-m-right_x-small">{asm.questionCount} questions</span>
+
+                                                    <template if:true={asm.alreadyAssigned}>
+                                                        <span class={asm.statusBadgeClass}>{asm.statusLabel}</span>
+                                                    </template>
+
+                                                    <template if:true={asm.canReassign}>
+                                                        <lightning-button
+                                                            label="Reassign"
+                                                            variant="brand-outline"
+                                                            class="slds-m-left_x-small"
+                                                            data-eligibility-id={asm.eligibilityId}
+                                                            data-name={asm.assignmentName}
+                                                            onclick={handleReassign}>
+                                                        </lightning-button>
+                                                    </template>
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                    </template>
+                                </template>
+                            </template>
+
+                        </div>
+                    </template>
+                </template>
+
+                <template if:false={hasData}>
+                    <div class="slds-text-align_center slds-m-around_medium slds-text-color_weak">
+                        No assignments found matching your search.
+                    </div>
+                </template>
+            </div>
+
+            <footer class="slds-modal__footer">
+                <lightning-button label="Cancel" onclick={handleClose}></lightning-button>
+                <lightning-button
+                    variant="brand"
+                    label={assignButtonLabel}
+                    disabled={noneSelected}
+                    onclick={handleAssign}
+                    class="slds-m-left_x-small">
+                </lightning-button>
+            </footer>
+        </div>
+    </section>
+    <div class="slds-backdrop slds-backdrop_open"></div>
+</template>

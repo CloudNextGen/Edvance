@@ -1,0 +1,262 @@
+<template>
+    <div class="portal-home">
+
+        <!-- ============ HERO ============ -->
+        <section class="hero-banner">
+            <div class="hero-copy">
+                <p class="hero-eyebrow">Onboarding Portal</p>
+                <h1 class="hero-title">{welcomeMessage}</h1>
+                <p class="hero-subtitle">
+                    Everything you need to check in, learn, complete assignments,
+                    and track your onboarding — all in one place.
+                </p>
+            </div>
+
+            <div class="hero-illustration" aria-hidden="true">
+                <svg viewBox="0 0 560 380" xmlns="http://www.w3.org/2000/svg" role="img">
+                    <circle cx="300" cy="190" r="200" fill="#EDE9FE" opacity="0.9" />
+                    <circle cx="460" cy="90" r="34" fill="#FEF3C7" />
+                    <circle cx="120" cy="300" r="26" fill="#CFFAFE" />
+                    <circle cx="30" cy="150" r="16" fill="#DBF6F1" opacity="0.8" />
+                    <circle cx="500" cy="290" r="18" fill="#FDE9D9" opacity="0.8" />
+                    <circle cx="70" cy="80" r="4" fill="#6C4FF6" opacity="0.35" />
+                    <circle cx="110" cy="60" r="3" fill="#6C4FF6" opacity="0.3" />
+                    <circle cx="150" cy="100" r="3" fill="#12B8A6" opacity="0.35" />
+                    <rect x="120" y="290" width="360" height="14" rx="7" fill="#DDD6FE" />
+                    <rect x="150" y="304" width="10" height="46" rx="3" fill="#C4B5FD" />
+                    <rect x="440" y="304" width="10" height="46" rx="3" fill="#C4B5FD" />
+                    <rect x="156" y="252" width="34" height="38" rx="6" fill="#6C4FF6" />
+                    <path d="M173 252 C160 232 160 214 173 198 C186 214 186 232 173 252 Z" fill="#12B8A6" />
+                    <path d="M173 252 C162 238 182 224 173 206" fill="none" stroke="#0B8A63" stroke-width="2" />
+                    <g>
+                        <rect x="230" y="230" width="150" height="98" rx="8" fill="#4C1D95" />
+                        <rect x="240" y="238" width="130" height="76" rx="4" fill="#FFFFFF" />
+                        <rect x="252" y="250" width="70" height="10" rx="5" fill="#6C4FF6" />
+                        <rect x="252" y="268" width="100" height="7" rx="3.5" fill="#DDD6FE" />
+                        <rect x="252" y="282" width="90" height="7" rx="3.5" fill="#DDD6FE" />
+                        <path d="M295 296 L305 306 L328 284" fill="none" stroke="#12B8A6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M218 328 L392 328 L378 340 L232 340 Z" fill="#5B21B6" />
+                    </g>
+                    <g>
+                        <rect x="396" y="270" width="34" height="30" rx="6" fill="#F5A623" />
+                        <path d="M430 276 q14 0 14 12 q0 12 -14 12" fill="none" stroke="#F5A623" stroke-width="5" />
+                        <path d="M404 262 q4 -8 0 -14" fill="none" stroke="#FCD34D" stroke-width="3" stroke-linecap="round" />
+                        <path d="M416 262 q4 -8 0 -14" fill="none" stroke="#FCD34D" stroke-width="3" stroke-linecap="round" />
+                    </g>
+                    <g>
+                        <rect x="358" y="76" width="140" height="92" rx="12" fill="#FFFFFF" stroke="#E9D5FF" stroke-width="2" />
+                        <circle cx="380" cy="99" r="6" fill="#6C4FF6" />
+                        <rect x="394" y="94" width="78" height="9" rx="4.5" fill="#E9D5FF" />
+                        <circle cx="380" cy="124" r="6" fill="#12B8A6" />
+                        <rect x="394" y="119" width="88" height="9" rx="4.5" fill="#D1FAE5" />
+                        <circle cx="380" cy="149" r="6" fill="#F5A623" />
+                        <rect x="394" y="144" width="62" height="9" rx="4.5" fill="#FEF3C7" />
+                    </g>
+                    <g>
+                        <path d="M60 130 a18 18 0 0 1 34 -6 a14 14 0 0 1 18 14 a16 16 0 0 1 -4 32 h-46 a16 16 0 0 1 -2 -40 z"
+                              fill="#FFFFFF" stroke="#C4B5FD" stroke-width="2" />
+                    </g>
+                    <g>
+                        <rect x="40" y="40" width="92" height="30" rx="15" fill="#FFFFFF" stroke="#DCD3FA" stroke-width="2" />
+                        <circle cx="58" cy="55" r="6" fill="#12B8A6" />
+                        <rect x="70" y="49" width="52" height="8" rx="4" fill="#E9E3FF" />
+                    </g>
+                    <circle cx="500" cy="220" r="5" fill="#6C4FF6" opacity="0.6" />
+                    <circle cx="60" cy="230" r="4" fill="#F5A623" opacity="0.6" />
+                </svg>
+            </div>
+        </section>
+
+        <!-- ============ PROFILE CONTACTS ============ -->
+        <template if:true={isCommunityUser}>
+            <section class="section-block profile-section">
+                <div class="section-header">
+                    <h2 class="section-title">Admin Details</h2>
+                </div>
+
+                <template if:true={isLoadingProfiles}>
+                    <div class="profile-skeleton" aria-live="polite">
+                        <div class="profile-skeleton-card"></div>
+                        <div class="profile-skeleton-card"></div>
+                    </div>
+                </template>
+
+                <template if:false={isLoadingProfiles}>
+                    <template if:true={hasProfileCards}>
+                        <div class="profile-grid">
+                            <template for:each={profileCards} for:item="card">
+                                <article key={card.key} class="profile-card">
+                                    <div class="profile-avatar">{card.profile.profile}</div>
+                                    <div class="profile-content">
+                                        <p class="profile-role">{card.label}</p>
+                                        <h3 class="profile-name">{card.profile.name}</h3>
+                                        <div class="profile-detail">
+                                            <span class="profile-label">Email</span>
+                                            <template if:true={card.profile.email}>
+                                                <lightning-formatted-email value={card.profile.email}></lightning-formatted-email>
+                                            </template>
+                                            <template if:false={card.profile.email}>
+                                                <span class="profile-value muted">Not available</span>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </article>
+                            </template>
+                        </div>
+                    </template>
+                    <template if:false={hasProfileCards}>
+                        <p class="empty-state">Profile contact details are not available right now.</p>
+                    </template>
+                </template>
+            </section>
+        </template>
+
+        <!-- ============ RAISE A REQUEST — FLOATING ACTION BUTTON ============ -->
+        <button class="fab-request" onclick={handleOpenRequestModal} aria-label="Raise a Request">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span class="fab-label">Raise a Request</span>
+        </button>
+
+        <!-- ============ RECENT ACTIVITY ============ -->
+        <section class="section-block">
+            <h2 class="section-title">Recent Activity</h2>
+
+            <template if:true={isLoadingRecent}>
+                <div class="recent-skeleton">
+                    <div class="skeleton-row"></div>
+                    <div class="skeleton-row"></div>
+                    <div class="skeleton-row"></div>
+                </div>
+            </template>
+
+            <template if:false={isLoadingRecent}>
+                <template if:true={hasRecentFiles}>
+                    <ul class="recent-list">
+                        <template for:each={recentFiles} for:item="file">
+                            <li key={file.id}
+                                class="recent-item"
+                                data-id={file.id}
+                                data-url={file.url}
+                                onclick={handleRecentFileClick}>
+                                <span class="recent-icon">{file.iconLetter}</span>
+                                <span class="recent-meta">
+                                    <span class="recent-name">{file.name}</span>
+                                    <span class="recent-time">{file.relativeTime}</span>
+                                </span>
+                                <span class="recent-arrow">›</span>
+                            </li>
+                        </template>
+                    </ul>
+                </template>
+                <template if:false={hasRecentFiles}>
+                    <p class="empty-state">No recent files yet — open something from Learning Documents to see it here.</p>
+                </template>
+            </template>
+        </section>
+        <!-- ============ Deduction UI ============ -->
+        <div class="slds-m-vertical_medium">
+            <c-top-deductions></c-top-deductions>
+        </div>
+
+        <!-- ============ WHAT THIS PORTAL GIVES YOU ============ -->
+        <section class="feature-section">
+            <div class="feature-intro">
+                <p class="hero-eyebrow">Why This Portal</p>
+                <h2 class="feature-heading">Everything about your onboarding, in one place</h2>
+                <p class="feature-subtext">
+                    Built to take the guesswork out of your first few months —
+                    here's what it does for you.
+                </p>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <div class="feature-icon feature-icon-purple">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                    </div>
+                    <h3 class="feature-title">One Place for Everything</h3>
+                    <p class="feature-desc">
+                        Attendance, learning material, assignments, and your training
+                        roadmap — no switching between tools to get your day done.
+                    </p>
+                </div>
+
+                <div class="feature-item">
+                    <div class="feature-icon feature-icon-green">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                    </div>
+                    <h3 class="feature-title">Structured Learning Path</h3>
+                    <p class="feature-desc">
+                        Content unlocks step by step as you progress, so you always
+                        know exactly what to focus on next.
+                    </p>
+                </div>
+
+                <div class="feature-item">
+                    <div class="feature-icon feature-icon-orange">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    </div>
+                    <h3 class="feature-title">AI-Evaluated Assessments</h3>
+                    <p class="feature-desc">
+                        Get instant, consistent feedback on your quizzes — no waiting
+                        around for manual grading.
+                    </p>
+                </div>
+
+                <div class="feature-item">
+                    <div class="feature-icon feature-icon-amber">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    </div>
+                    <h3 class="feature-title">Always in the Loop</h3>
+                    <p class="feature-desc">
+                        Raise a request anytime and track everything you've recently
+                        opened, right from this dashboard.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ RAISE A REQUEST MODAL ============ -->
+        <template if:true={showRequestModal}>
+            <section class="modal-backdrop" onclick={handleCloseRequestModal}>
+                <div class="modal-panel" onclick={stopPropagation}>
+                    <header class="modal-header">
+                        <h2>Raise a Request</h2>
+                        <button class="modal-close" onclick={handleCloseRequestModal} aria-label="Close">×</button>
+                    </header>
+
+                    <div class="modal-body">
+                        <label class="field-label" for="requestType">Request Type</label>
+                        <select id="requestType" class="field-input" onchange={handleRequestTypeChange}>
+                            <template for:each={requestTypeOptions} for:item="opt">
+                                <option key={opt} value={opt}>{opt}</option>
+                            </template>
+                        </select>
+
+                        <label class="field-label" for="requestDescription">Description</label>
+                        <textarea id="requestDescription"
+                                  class="field-input field-textarea"
+                                  rows="4"
+                                  placeholder="Tell us what you need help with..."
+                                  onchange={handleRequestDescriptionChange}></textarea>
+
+                        <template if:true={requestError}>
+                            <p class="field-error">{requestError}</p>
+                        </template>
+                    </div>
+
+                    <footer class="modal-footer">
+                        <button class="btn-secondary" onclick={handleCloseRequestModal}>Cancel</button>
+                        <button class="btn-primary" onclick={handleSubmitRequest} disabled={isSubmittingRequest}>
+                            <template if:true={isSubmittingRequest}>Submitting…</template>
+                            <template if:false={isSubmittingRequest}>Submit Request</template>
+                        </button>
+                    </footer>
+                </div>
+            </section>
+        </template>
+
+    </div>
+</template>

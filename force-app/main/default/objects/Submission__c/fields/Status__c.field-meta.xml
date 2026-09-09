@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Status__c</fullName>
+    <inlineHelpText>Pipeline stage tracking status for the candidate submission.</inlineHelpText>
+    <label>Status</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Submitted</fullName>
+                <default>true</default>
+                <label>Submitted</label>
+            </value>
+            <value>
+                <fullName>Shortlisted</fullName>
+                <default>false</default>
+                <label>Shortlisted</label>
+            </value>
+            <value>
+                <fullName>Interview Scheduled</fullName>
+                <default>false</default>
+                <label>Interview Scheduled</label>
+            </value>
+            <value>
+                <fullName>Selected</fullName>
+                <default>false</default>
+                <label>Selected</label>
+            </value>
+            <value>
+                <fullName>Offer</fullName>
+                <default>false</default>
+                <label>Offer</label>
+            </value>
+            <value>
+                <fullName>Placed</fullName>
+                <default>false</default>
+                <label>Placed</label>
+            </value>
+            <value>
+                <fullName>Rejected</fullName>
+                <default>false</default>
+                <label>Rejected</label>
+            </value>
+            <value>
+                <fullName>Interviewed</fullName>
+                <default>false</default>
+                <label>Interviewed</label>
+            </value>
+            <value>
+                <fullName>Withdrawn</fullName>
+                <default>false</default>
+                <label>Withdrawn</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

@@ -1,0 +1,80 @@
+<template>
+    <div class="drive-browser">
+
+        <div class="drive-breadcrumb">
+            <template for:each={breadcrumbItems} for:item="crumb">
+                <span key={crumb.index} class="crumb-wrap">
+                    <template if:false={crumb.isLast}>
+                        <button
+                            class="crumb-link"
+                            data-index={crumb.index}
+                            onclick={handleBreadcrumbClick}>
+                            {crumb.name}
+                        </button>
+                        <span class="crumb-sep">/</span>
+                    </template>
+                    <template if:true={crumb.isLast}>
+                        <span class="crumb-current">{crumb.name}</span>
+                    </template>
+                </span>
+            </template>
+        </div>
+
+        <template if:true={isLoading}>
+            <div class="drive-loading">
+                <div class="drive-spinner"></div>
+                <p>Loading content…</p>
+            </div>
+        </template>
+
+        <template if:true={errorMessage}>
+            <div class="drive-error">
+                <p>{errorMessage}</p>
+            </div>
+        </template>
+
+        <template if:true={hasNoItems}>
+            <div class="drive-empty">
+                <p>This folder is empty.</p>
+            </div>
+        </template>
+
+        <template if:false={isLoading}>
+            <div class="drive-list">
+                <template for:each={items} for:item="item">
+                    <div
+                        key={item.id}
+                        class={item.rowClass}
+                        data-id={item.id}
+                        data-name={item.name}
+                        data-folder={item.isFolder}
+                        data-link={item.webViewLink}
+                        onclick={handleItemClick}
+                        tabindex="0">
+
+                        <div class="drive-icon-wrap">
+                            <lightning-icon icon-name={item.iconName} size="small"></lightning-icon>
+                        </div>
+
+                        <div class="drive-info">
+                            <p class="drive-name">{item.name}</p>
+                            <template if:true={item.sizeLabel}>
+                                <p class="drive-meta">{item.sizeLabel}</p>
+                            </template>
+                        </div>
+
+                        <div class="drive-action">
+                            <template if:true={item.isFolder}>
+                                <lightning-icon icon-name="utility:chevronright" size="xx-small"></lightning-icon>
+                            </template>
+                            <template if:false={item.isFolder}>
+                                <span class="drive-open-label">Open →</span>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </template>
+
+    </div>
+</template>

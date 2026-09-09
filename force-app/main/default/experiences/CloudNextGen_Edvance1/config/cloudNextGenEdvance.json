@@ -1,0 +1,18 @@
+{
+  "forgotPasswordRouteId" : "4867cb01-b826-433c-b67f-e1d81dbb691f",
+  "isAvailableToGuests" : false,
+  "isFilteredComponentsView" : false,
+  "isProgressiveRenderingEnabled" : false,
+  "loginAppPageId" : "a08e047d-8486-473e-8e74-a7635c6ba1ae",
+  "mainAppPageId" : "6bc70838-1f40-40f7-9d18-4c380517876f",
+  "preferredDomain" : "none",
+  "selfRegistrationRouteId" : "fe3778aa-e835-4a4f-9a43-8e1d7c4a1cd1",
+  "trustedSitesForScript" : [ {
+    "id" : "b075c5f9-8cda-4270-99b0-ac999b03e835",
+    "isActive" : true,
+    "trustedSiteName" : "Google Drive",
+    "trustedSiteUrl" : "https://docs.google.com",
+    "type" : "trustedSitesForScripts"
+  } ],
+  "type" : "site"
+}

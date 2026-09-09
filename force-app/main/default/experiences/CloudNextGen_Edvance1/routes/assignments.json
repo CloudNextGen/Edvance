@@ -1,0 +1,12 @@
+{
+  "activeViewId" : "ea174597-f012-4dbd-8e8f-a52b737205b2",
+  "appPageId" : "6bc70838-1f40-40f7-9d18-4c380517876f",
+  "configurationTags" : [ ],
+  "devName" : "Assignments__c",
+  "id" : "f9e5c0fe-743c-4668-94af-396f7e21392f",
+  "label" : "Assignments",
+  "pageAccess" : "UseParent",
+  "routeType" : "custom-assignments",
+  "type" : "route",
+  "urlPrefix" : "assignments"
+}

@@ -1,0 +1,595 @@
+import { LightningElement, wire } from 'lwc';
+import { refreshApex } from '@salesforce/apex';
+import getTodayRecord from '@salesforce/apex/AttendanceController.getTodayRecord';
+import submitPunch from '@salesforce/apex/AttendanceController.submitPunch';
+import submitAppeal from '@salesforce/apex/AttendanceController.submitAppeal';
+import getHistory from '@salesforce/apex/AttendanceController.getHistory';
+
+const TYPE_LABELS = {
+    'Office Check-In': 'Office Check-In',
+    'Lunch Check-Out': 'Lunch Out',
+    'Lunch Check-In': 'Back from Lunch',
+    'Office Check-Out': 'Office Check-Out'
+};
+
+const TYPE_ICONS = {
+    'Office Check-In': 'utility:check',
+    'Lunch Check-Out': 'utility:food_and_drink',
+    'Lunch Check-In': 'utility:logout',
+    'Office Check-Out': 'utility:logout'
+};
+
+function isoDate(d) {
+    return d.toISOString().slice(0, 10);
+}
+
+export default class AttendanceCapture extends LightningElement {
+    // ---- Today / capture / appeal state ----
+    isCapturing = false;
+    errorMessage = '';
+    resultMessage = '';
+
+    appealOpenForId = null;
+    appealText = '';
+    isSubmittingAppeal = false;
+
+    wiredRecordResult;
+    capturedCoords = null;
+    selectedPunchType = null;
+
+    // ---- History state ----
+    showHistory = false;
+    historyLoaded = false;
+    historyStartDate;
+    historyEndDate;
+    historyLateOnly = false;
+    isHistoryLoading = false;
+    historyErrorMessage = '';
+    historyRows = [];
+    historyPageNumber = 0;
+    historyTotalCount = 0;
+
+    // KPI Summary Metrics for History
+    totalLateCount = 0;
+    totalDeductionAmount = 0;
+
+    showCameraModal = false;
+    isPhotoConfirmStep = false;
+    capturedPhotoDataUrl = null;
+    capturedPhotoBase64 = null;
+    cameraErrorMessage = '';
+    cameraStream = null;
+
+    @wire(getTodayRecord)
+    wiredRecord(result) {
+        this.wiredRecordResult = result;
+    }
+
+    disconnectedCallback() {
+        if (this.cameraStream) {
+            this.cameraStream.getTracks().forEach((track) => track.stop());
+            this.cameraStream = null;
+        }
+    }
+
+    get isLoading() {
+        return !this.wiredRecordResult || (!this.wiredRecordResult.data && !this.wiredRecordResult.error);
+    }
+
+    get record() {
+        return this.wiredRecordResult && this.wiredRecordResult.data
+            ? this.wiredRecordResult.data
+            : null;
+    }
+
+    get isDone() {
+        return this.record ? this.record.isDone : false;
+    }
+
+    get displayEntries() {
+        if (!this.record) {
+            return [];
+        }
+        return this.record.entries.map((entry) => {
+            const isAppealOpen = this.appealOpenForId === entry.id;
+            const canAppeal = entry.completed && entry.status === 'Not Excused' && !entry.excusalReason;
+            const appealSubmitted = entry.completed && entry.status === 'Pending' && !!entry.excusalReason;
+
+            return {
+                ...entry,
+                key: entry.type,
+                label: TYPE_LABELS[entry.type],
+                iconName: TYPE_ICONS[entry.type],
+                formattedTime: entry.completed ? this.formatTime(entry.eventTimestamp) : '—',
+                badgeText: this.badgeTextFor(entry, appealSubmitted),
+                badgeClass: this.badgeClassFor(entry, appealSubmitted),
+                rowClass: entry.completed ? 'punch-row punch-row_done' : 'punch-row punch-row_pending',
+                canAppeal,
+                appealSubmitted,
+                isAppealOpen,
+                disableButton: entry.completed || !entry.eligible || this.isCapturing
+            };
+        });
+    }
+
+    get todayRecordErrorMessage() {
+        const err = this.wiredRecordResult && this.wiredRecordResult.error;
+        return err ? (err?.body?.message ?? err?.message ?? 'Could not load today\'s attendance.') : '';
+    }
+
+    async openCameraModal() {
+        this.cameraErrorMessage = '';
+        this.capturedPhotoDataUrl = null;
+        this.capturedPhotoBase64 = null;
+        this.isPhotoConfirmStep = false;
+        this.isCapturing = false;
+        this.showCameraModal = true;
+
+        try {
+            this.cameraStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'user' },
+                audio: false
+            });
+            Promise.resolve().then(() => {
+                const video = this.template.querySelector('.camera-video');
+                if (video) {
+                    video.srcObject = this.cameraStream;
+                }
+            });
+        } catch (e) {
+            this.cameraErrorMessage = this.cameraErrorMessageFor(e);
+            this.isCapturing = false;
+        }
+    }
+
+    cameraErrorMessageFor(error) {
+        if (error && error.name === 'NotAllowedError') {
+            return 'Camera access is turned off for this site. Enable it in your browser\'s site settings, then try again.';
+        }
+        if (error && error.name === 'NotFoundError') {
+            return 'No camera was found on this device.';
+        }
+        return 'Couldn\'t start the camera. Please try again.';
+    }
+
+    handleCaptureFrame() {
+        const video = this.template.querySelector('.camera-video');
+        if (!video || !video.videoWidth) {
+            this.cameraErrorMessage = 'Camera isn\'t ready yet. Please wait a moment and try again.';
+            return;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        this.capturedPhotoDataUrl = dataUrl;
+        this.capturedPhotoBase64 = dataUrl.split(',')[1];
+        this.isPhotoConfirmStep = true;
+    }
+
+    handleRetake() {
+        this.capturedPhotoDataUrl = null;
+        this.capturedPhotoBase64 = null;
+        this.isPhotoConfirmStep = false;
+        Promise.resolve().then(() => {
+            const video = this.template.querySelector('.camera-video');
+            if (video && this.cameraStream) {
+                video.srcObject = this.cameraStream;
+            }
+        });
+    }
+
+    async handleConfirmPhoto() {
+        try {
+            this.isCapturing = true;
+            const compressedBase64 = await this.compressImage(this.capturedPhotoBase64);
+            this.closeCameraModal();
+            this.doSubmit(compressedBase64, 'image/jpeg');
+        } catch (error) {
+            this.cameraErrorMessage = 'Failed to process photo. Please try again.';
+        } finally {
+            this.isCapturing = false;
+        }
+    }
+
+    handleCancelCamera() {
+        this.closeCameraModal();
+        this.isCapturing = false;
+        this.selectedPunchType = null;
+    }
+
+    closeCameraModal() {
+        if (this.cameraStream) {
+            this.cameraStream.getTracks().forEach((track) => track.stop());
+            this.cameraStream = null;
+        }
+        this.showCameraModal = false;
+        this.isPhotoConfirmStep = false;
+        this.capturedPhotoDataUrl = null;
+        this.capturedPhotoBase64 = null;
+        this.cameraErrorMessage = '';
+    }
+
+    handleHistoryPrevPage() {
+        if (this.historyPageNumber > 0) {
+            this.historyPageNumber -= 1;
+            this.loadHistory();
+        }
+    }
+
+    handleHistoryNextPage() {
+        if (this.hasMoreHistoryPages) {
+            this.historyPageNumber += 1;
+            this.loadHistory();
+        }
+    }
+
+    get historyTotalPages() {
+        return Math.max(1, Math.ceil(this.historyTotalCount / 10));
+    }
+
+    get historyPageLabel() {
+        return `Page ${this.historyPageNumber + 1} of ${this.historyTotalPages}`;
+    }
+
+    get isFirstHistoryPage() {
+        return this.historyPageNumber === 0;
+    }
+
+    get hasMoreHistoryPages() {
+        return (this.historyPageNumber + 1) * 10 < this.historyTotalCount;
+    }
+
+    get noMoreHistoryPages() { return !this.hasMoreHistoryPages; }
+
+    showPunchModal = false;
+
+    get nextPunchEntry() {
+        return this.displayEntries.find((e) => !e.disableButton)
+            || this.displayEntries.find((e) => !e.completed);
+    }
+
+    get nextPunchLabel() {
+        return this.nextPunchEntry ? this.nextPunchEntry.label : 'Log Attendance';
+    }
+
+    openPunchModal() {
+        this.showPunchModal = true;
+    }
+
+    closePunchModal() {
+        this.showPunchModal = false;
+    }
+
+    stopPropagation(event) {
+        event.stopPropagation();
+    }
+
+    handleCaptureFromModal(event) {
+        this.closePunchModal();
+        this.handleCapture(event);
+    }
+
+    formatTime(isoString) {
+        if (!isoString) return '—';
+        const d = new Date(isoString);
+        return d.toLocaleTimeString('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+    }
+
+    formatLateMinutes(minutes) {
+        if (!minutes || minutes <= 0) return '0 min';
+        if (minutes < 60) return `${minutes} min`;
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+    }
+
+    badgeTextFor(entry, appealSubmitted) {
+        if (!entry.completed) return 'Not yet';
+        if (entry.status === 'On Time') return 'On time';
+        if (entry.status === 'Excused') return 'Excused';
+        if (entry.status === 'Not Excused' && !appealSubmitted) return `Late ${this.formatLateMinutes(entry.lateMinutes)}`;
+        if (entry.status === 'Not Excused') return 'Deduction applied';
+        if (entry.status === 'Pending' && appealSubmitted) return 'Appeal submitted';
+        if (entry.status === 'Pending') return `Late ${this.formatLateMinutes(entry.lateMinutes)}`;
+        if (!entry.status) return 'Recorded';
+        return entry.status;
+    }
+
+    badgeClassFor(entry, appealSubmitted) {
+        if (!entry.completed) return 'badge badge_muted';
+        if (entry.status === 'On Time' || entry.status === 'Excused') return 'badge badge_success';
+        if (entry.status === 'Not Excused') return 'badge badge_danger';
+        if (entry.status === 'Pending' && appealSubmitted) return 'badge badge_info';
+        if (entry.status === 'Pending') return 'badge badge_warning';
+        return 'badge badge_muted';
+    }
+
+    handleCapture(event) {
+        this.errorMessage = '';
+        this.resultMessage = '';
+        this.selectedPunchType = event.currentTarget.dataset.type;
+        this.isCapturing = true;
+
+        if (!navigator.geolocation) {
+            this.errorMessage = 'Location isn\'t supported on this device/browser.';
+            this.isCapturing = false;
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                this.capturedCoords = position.coords;
+
+                const entry = this.record
+                    ? this.record.entries.find((e) => e.type === this.selectedPunchType)
+                    : null;
+
+                if (entry && entry.needsPhoto === false) {
+                    this.doSubmit(null, null);
+                    return;
+                }
+
+                this.openCameraModal();
+            },
+            (error) => {
+                this.errorMessage = this.locationErrorMessage(error);
+                this.isCapturing = false;
+            },
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        );
+    }
+
+    locationErrorMessage(error) {
+        switch (error.code) {
+            case error.PERMISSION_DENIED:
+                return 'Location access is turned off for this site. Enable it in your browser\'s site settings, then try again.';
+            case error.POSITION_UNAVAILABLE:
+                return 'Couldn\'t determine your location. Move to an area with better signal and try again.';
+            case error.TIMEOUT:
+                return 'Location took too long to respond. Please try again.';
+            default:
+                return 'Location error: ' + error.message;
+        }
+    }
+
+    async compressImage(base64Data, maxWidth = 480, quality = 0.6) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const scale = Math.min(1, maxWidth / img.width);
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const compressed = canvas.toDataURL('image/jpeg', quality);
+                resolve(compressed.split(',')[1]);
+            };
+            img.src = 'data:image/jpeg;base64,' + base64Data;
+        });
+    }
+
+    async doSubmit(base64Photo, contentType) {
+        try {
+            const result = await submitPunch({
+                punchType: this.selectedPunchType,
+                latitude: this.capturedCoords.latitude,
+                longitude: this.capturedCoords.longitude,
+                accuracyMeters: this.capturedCoords.accuracy,
+                photoBase64: base64Photo,
+                contentType
+            });
+            if (result.success) {
+                this.resultMessage = result.message;
+            } else {
+                this.errorMessage = result.message;
+            }
+            await refreshApex(this.wiredRecordResult);
+            if (this.historyLoaded) {
+                this.loadHistory();
+            }
+        } catch (e) {
+            this.errorMessage = e?.body?.message ?? e?.message ?? 'An unexpected error occurred.';
+        } finally {
+            this.isCapturing = false;
+            this.selectedPunchType = null;
+        }
+    }
+
+    handleOpenAppeal(event) {
+        this.errorMessage = '';
+        this.appealOpenForId = event.currentTarget.dataset.id;
+        this.appealText = '';
+    }
+
+    handleCancelAppeal() {
+        this.appealOpenForId = null;
+        this.appealText = '';
+    }
+
+    handleAppealTextChange(event) {
+        this.appealText = event.target.value;
+    }
+
+    async handleSubmitAppeal(event) {
+        const logId = event.currentTarget.dataset.id;
+        if (!this.appealText || !this.appealText.trim()) {
+            this.errorMessage = 'Please enter a reason before submitting.';
+            return;
+        }
+        this.isSubmittingAppeal = true;
+        try {
+            await submitAppeal({ logId, reason: this.appealText.trim() });
+            this.resultMessage = 'Appeal submitted for manager review.';
+            this.appealOpenForId = null;
+            this.appealText = '';
+            await refreshApex(this.wiredRecordResult);
+            if (this.historyLoaded) {
+                this.loadHistory();
+            }
+        } catch (e) {
+            this.historyErrorMessage = e?.body?.message ?? e?.message ?? 'An unexpected error occurred.';
+        } finally {
+            this.isSubmittingAppeal = false;
+        }
+    }
+
+    handleToggleHistory() {
+        this.showHistory = !this.showHistory;
+        if (this.showHistory && !this.historyLoaded) {
+            const today = new Date();
+            const past = new Date();
+            past.setDate(past.getDate() - 7);
+            this.historyEndDate = isoDate(today);
+            this.historyStartDate = isoDate(past);
+            this.loadHistory();
+        }
+    }
+
+    handleHistoryStartDateChange(event) {
+        this.historyStartDate = event.target.value || null;
+    }
+
+    handleHistoryEndDateChange(event) {
+        this.historyEndDate = event.target.value || null;
+    }
+
+    handleHistoryLateOnlyChange(event) {
+        this.historyLateOnly = event.target.checked;
+    }
+
+    handleApplyHistoryFilter() {
+        if (!this.historyStartDate || !this.historyEndDate) {
+            this.historyErrorMessage = 'Please select both From and To dates before applying the filter.';
+            return;
+        }
+        this.historyPageNumber = 0;
+        this.loadHistory();
+    }
+
+    // Export history records to CSV spreadsheet file
+    handleExport() {
+        if (!this.historyRows || this.historyRows.length === 0) {
+            this.historyErrorMessage = 'No history records available to export.';
+            return;
+        }
+
+        const headers = ['Date', 'Office In', 'Office Out', 'Lunch Out', 'Lunch In', 'Office Late', 'Lunch Late', 'Deduction', 'Status'];
+        const csvRows = [headers.join(',')];
+
+        this.historyRows.forEach(row => {
+            const values = [
+                `"${row.date || ''}"`,
+                `"${row.officeIn || ''}"`,
+                `"${row.officeOut || ''}"`,
+                `"${row.lunchOut || ''}"`,
+                `"${row.lunchIn || ''}"`,
+                `"${row.officeLateMinutes || ''}"`,
+                `"${row.lunchLateMinutes || ''}"`,
+                `"${row.deduction || 0}"`,
+                `"${row.statusText || ''}"`
+            ];
+            csvRows.push(values.join(','));
+        });
+
+        const csvContent = 'data:text/csv;charset=utf-8,' + csvRows.join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', `My_Attendance_History.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    async loadHistory() {
+        if (!this.historyStartDate || !this.historyEndDate) {
+            this.historyErrorMessage = 'Please select both From and To dates before applying the filter.';
+            this.historyLoaded = false;
+            this.historyRows = [];
+            return;
+        }
+
+        this.isHistoryLoading = true;
+        this.historyErrorMessage = '';
+        try {
+            const result = await getHistory({
+                startDate: this.historyStartDate,
+                endDate: this.historyEndDate,
+                lateOnly: this.historyLateOnly,
+                pageNumber: this.historyPageNumber
+            });
+            this.historyRows = result.records.map((r) => this.mapHistoryRow(r));
+            this.historyTotalCount = result.totalCount;
+
+            this.totalLateCount = result.records.filter(row => 
+                (row.Office_Late_Minutes__c && row.Office_Late_Minutes__c > 0) || 
+                (row.Lunch_Late_Minutes__c && row.Lunch_Late_Minutes__c > 0)
+            ).length;
+
+            this.totalDeductionAmount = result.records.reduce((sum, row) => sum + (row.Total_Deduction_Amount__c || 0), 0);
+
+            this.historyLoaded = true;
+        } catch (e) {
+            this.historyErrorMessage = e?.body?.message ?? e?.message ?? 'An unexpected error occurred.';
+        } finally {
+            this.isHistoryLoading = false;
+        }
+    }
+
+    mapHistoryRow(r) {
+        const deduction = r.Total_Deduction_Amount__c || 0;
+        const statuses = r.Attendance_Logs__r
+            ? r.Attendance_Logs__r.map((log) => log.Status__c).filter(Boolean)
+            : [];
+
+        let statusText = 'On time';
+        let statusClass = 'badge badge_success';
+        if (statuses.includes('Not Excused')) {
+            statusText = 'Deduction applied';
+            statusClass = 'badge badge_danger';
+        } else if (statuses.includes('Excused')) {
+            statusText = 'Excused';
+            statusClass = 'badge badge_success';
+        } else if (statuses.includes('Pending')) {
+            statusText = 'Late — pending review';
+            statusClass = 'badge badge_warning';
+        }
+        return {
+            id: r.Id,
+            date: this.formatDate(r.Date__c),
+            officeIn: this.formatTime(r.Office_Check_In_Time__c),
+            officeOut: this.formatTime(r.Office_Check_Out_Time__c),
+            lunchOut: this.formatTime(r.Lunch_Out_Time__c),
+            lunchIn: this.formatTime(r.Lunch_In_Time__c),
+            officeLateMinutes: this.formatLateMinutes(r.Office_Late_Minutes__c || 0),
+            lunchLateMinutes: this.formatLateMinutes(r.Lunch_Late_Minutes__c || 0),
+            deduction,
+            statusText,
+            statusClass
+        };
+    }
+
+    formatDate(d) {
+        if (!d) return '—';
+        const dt = new Date(d + 'T00:00:00');
+        return dt.toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    get hasHistoryRows() {
+        return !this.isHistoryLoading && this.historyRows.length > 0;
+    }
+
+    get noHistoryRows() {
+        return !this.isHistoryLoading && this.historyRows.length === 0;
+    }
+}

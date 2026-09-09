@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Total_Deduction_Amount__c</fullName>
+    <label>Total Deduction Amount</label>
+    <summarizedField>Attendance_Log__c.Deduction_Amount__c</summarizedField>
+    <summaryFilterItems>
+        <field>Attendance_Log__c.Status__c</field>
+        <operation>equals</operation>
+        <value>Not Excused</value>
+    </summaryFilterItems>
+    <summaryFilterItems>
+        <field>Attendance_Log__c.Excused_By__c</field>
+        <operation>notEqual</operation>
+        <value>null</value>
+    </summaryFilterItems>
+    <summaryForeignKey>Attendance_Log__c.Attendance_Summary__c</summaryForeignKey>
+    <summaryOperation>sum</summaryOperation>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Summary</type>
+</CustomField>

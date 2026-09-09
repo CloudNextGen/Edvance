@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>MENTOR__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>Intruction Visjble to mentor</description>
+    <fieldManageability>DeveloperControlled</fieldManageability>
+    <label>MENTOR</label>
+    <type>Checkbox</type>
+</CustomField>

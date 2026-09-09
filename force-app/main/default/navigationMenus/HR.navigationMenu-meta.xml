@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NavigationMenu xmlns="http://soap.sforce.com/2006/04/metadata">
+    <container>CloudNextGen Edvance</container>
+    <containerType>Network</containerType>
+    <label>HR</label>
+    <navigationMenuItem>
+        <label>Attendance</label>
+        <position>1</position>
+        <publiclyAvailable>true</publiclyAvailable>
+        <target>/attendance</target>
+        <type>InternalLink</type>
+    </navigationMenuItem>
+    <navigationMenuItem>
+        <label>Dashboard</label>
+        <position>2</position>
+        <publiclyAvailable>false</publiclyAvailable>
+        <target>/dashboard</target>
+        <type>InternalLink</type>
+    </navigationMenuItem>
+</NavigationMenu>

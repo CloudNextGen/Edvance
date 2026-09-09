@@ -1,0 +1,89 @@
+<template>
+    <lightning-card title="Create Contact & Community User">
+        <div class="slds-p-around_medium">
+
+            <!-- First Name -->
+            <lightning-input
+                label="First Name"
+                value={firstName}
+                onchange={handleChange}
+                data-field="firstName"
+                required>
+            </lightning-input>
+
+            <!-- Last Name -->
+            <lightning-input
+                label="Last Name"
+                value={lastName}
+                onchange={handleChange}
+                data-field="lastName"
+                required>
+            </lightning-input>
+
+            <!-- Email -->
+            <lightning-input
+                type="email"
+                label="Email"
+                value={email}
+                onchange={handleChange}
+                data-field="email"
+                required>
+            </lightning-input>
+
+            <!-- Phone -->
+            <lightning-input
+                type="tel"
+                label="Phone"
+                value={phone}
+                onchange={handleChange}
+                data-field="phone">
+            </lightning-input>
+
+            <!-- Account Record Picker -->
+            <lightning-record-picker
+                label="Account"
+                placeholder="Search Accounts..."
+                object-api-name="Account"
+                value={selectedAccountId}
+                onchange={handleAccountChange}
+                required>
+            </lightning-record-picker>
+
+            <!-- User Type — Only Mentor & Team Member (No HR) -->
+            <lightning-combobox
+                label="User Type"
+                value={userType}
+                options={userTypeOptions}
+                onchange={handleUserTypeChange}
+                placeholder="Select User Type"
+                required>
+            </lightning-combobox>
+
+            <!-- Submit Button -->
+            <div class="slds-m-top_medium">
+                <lightning-button
+                    variant="brand"
+                    label="Create Contact & User"
+                    onclick={handleSubmit}
+                    disabled={isLoading}>
+                </lightning-button>
+            </div>
+
+            <!-- Loading Spinner -->
+            <template if:true={isLoading}>
+                <lightning-spinner
+                    alternative-text="Creating user..."
+                    size="small">
+                </lightning-spinner>
+            </template>
+
+            <!-- Inline Error/Status Message (Optional Backup) -->
+            <template if:true={message}>
+                <div class={messageClass}>
+                    <p>{message}</p>
+                </div>
+            </template>
+
+        </div>
+    </lightning-card>
+</template>

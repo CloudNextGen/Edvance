@@ -1,0 +1,20 @@
+/* creatingCommunityUser.css */
+.success-message {
+    color: #2e7d32;
+    font-weight: bold;
+    padding: 10px;
+    background-color: #e8f5e9;
+    border-radius: 4px;
+    margin-top: 10px;
+    border-left: 4px solid #2e7d32;
+}
+
+.error-message {
+    color: #c62828;
+    font-weight: bold;
+    padding: 10px;
+    background-color: #ffebee;
+    border-radius: 4px;
+    margin-top: 10px;
+    border-left: 4px solid #c62828;
+}

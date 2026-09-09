@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Manager__c</fullName>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <label>Manager</label>
+    <lookupFilter>
+        <active>true</active>
+        <filterItems>
+            <field>$Profile.Name</field>
+            <operation>notEqual</operation>
+            <value>Customer Community Login User, Customer Community Plus Login User, Customer Community Plus User, Customer Community User</value>
+        </filterItems>
+        <isOptional>false</isOptional>
+    </lookupFilter>
+    <referenceTo>User</referenceTo>
+    <relationshipName>Contacts</relationshipName>
+    <required>false</required>
+    <trackFeedHistory>false</trackFeedHistory>
+    <type>Lookup</type>
+</CustomField>

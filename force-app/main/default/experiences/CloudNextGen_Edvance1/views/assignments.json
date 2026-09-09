@@ -1,0 +1,68 @@
+{
+  "appPageId" : "6bc70838-1f40-40f7-9d18-4c380517876f",
+  "componentName" : "siteforce:dynamicLayout",
+  "dataProviders" : [ ],
+  "id" : "ea174597-f012-4dbd-8e8f-a52b737205b2",
+  "label" : "Assignments",
+  "regions" : [ {
+    "components" : [ {
+      "componentAttributes" : {
+        "background" : "background: rgba(0,0,0,0)",
+        "backgroundOverlay" : "rgba(0,0,0,0.5)",
+        "contentAreaWidth" : 100,
+        "sectionConfig" : {
+          "UUID" : "cd9e2fd1-f7c1-4a8a-97bd-198414efff45",
+          "columns" : [ {
+            "UUID" : "a6711134-4b43-41d1-bee9-532983c86a75",
+            "columnKey" : "1",
+            "columnName" : "Column 1",
+            "columnWidth" : "12",
+            "seedComponents" : [ ]
+          } ]
+        },
+        "sectionHeight" : 300
+      },
+      "componentName" : "forceCommunity:section",
+      "id" : "cd9e2fd1-f7c1-4a8a-97bd-198414efff45",
+      "regions" : [ {
+        "components" : [ {
+          "componentAttributes" : { },
+          "componentName" : "c:assignmentEngine",
+          "id" : "1c572ec8-8f56-4a22-a2e1-158bcc20d637",
+          "renderPriority" : "NEUTRAL",
+          "renditionMap" : { },
+          "type" : "component"
+        } ],
+        "id" : "a6711134-4b43-41d1-bee9-532983c86a75",
+        "regionLabel" : "Column 1",
+        "regionName" : "1",
+        "renditionMap" : { },
+        "type" : "region"
+      } ],
+      "renderPriority" : "NEUTRAL",
+      "renditionMap" : { },
+      "type" : "component"
+    } ],
+    "id" : "4611b291-760d-4fe7-a166-163cbab266ef",
+    "regionName" : "content",
+    "type" : "region"
+  }, {
+    "components" : [ {
+      "componentAttributes" : {
+        "customHeadTags" : "",
+        "description" : "",
+        "title" : "Assignments"
+      },
+      "componentName" : "forceCommunity:seoAssistant",
+      "id" : "c94293ee-7f02-430e-91f9-a5770c860f59",
+      "renditionMap" : { },
+      "type" : "component"
+    } ],
+    "id" : "d0d5370e-ed93-477c-a85c-b070d1278689",
+    "regionName" : "sfdcHiddenRegion",
+    "type" : "region"
+  } ],
+  "themeLayoutType" : "Inner",
+  "type" : "view",
+  "viewType" : "custom-assignments"
+}

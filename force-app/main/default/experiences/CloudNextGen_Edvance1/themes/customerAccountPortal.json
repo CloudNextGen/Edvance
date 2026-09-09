@@ -1,0 +1,148 @@
+{
+  "activeBrandingSetId" : "4b1da0a2-2e4a-4fd1-b5c2-657a385508d3",
+  "customCSS" : "/* 1. Keep all navigation text uniform and slightly larger */\na.slds-container_fluid.slds-truncate,\na.slds-container_fluid.slds-truncate * {\n    font-weight: 700 !important;\n    font-size: 0.95rem !important;\n    color: #1A1D3B !important;\n}\n\n/* Active navigation item highlight */\na.slds-container_fluid.slds-truncate.slds-is-active,\na.slds-container_fluid.slds-truncate.slds-is-active * {\n    font-weight: 800 !important;\n}\n\n/* Base desktop styles for Powered by watermark */\n.selfServiceUserProfileMenu::before,\ndiv[class*=\"userProfile\"]::before {\n    content: \"Powered by CloudNextGen IT Solutions\" !important;\n    position: absolute !important;\n    right: 130% !important;\n    top: 50% !important;\n    transform: translateY(-50%) !important;\n    font-size: 0.95rem !important;\n    font-weight: 700 !important;\n    background: linear-gradient(90deg, #1EC9C0 0%, #17A9D8 25%, #1A7FD4 50%, #3D5FC4 70%, #6B4FA8 85%, #B7C15A 100%) !important;\n    -webkit-background-clip: text !important;\n    background-clip: text !important;\n    -webkit-text-fill-color: transparent !important;\n    color: transparent !important;\n    white-space: nowrap !important;\n    display: block !important;\n    z-index: 1 !important;\n    line-height: 1 !important;\n    margin-top: -1px !important;\n    letter-spacing: 0.2px !important;\n    pointer-events: none !important;\n}\n\n/* Mobile responsive adjustments */\n@media screen and (max-width: 768px) {\n    .selfServiceUserProfileMenu::before,\n    div[class*=\"userProfile\"]::before {\n        content: \"Powered by CloudNextGen IT Solutions\" !important;\n        right: 0 !important;\n        top: 130% !important;\n        transform: none !important;\n        font-size: 0.70rem !important;\n    }\n}\n\n@media screen and (max-width: 768px) {\n    .selfServiceProfileMenuTrigger .triggerDownArrow.down-arrow {\n        display: inline-block !important;\n        width: 0 !important;\n        height: 0 !important;\n        border-top: 5px solid rgba(34, 34, 34, 0.8) !important;\n        border-left: 5px solid transparent !important;\n        border-right: 5px solid transparent !important;\n        margin-left: 4px !important;\n        vertical-align: middle !important;\n    }\n}\n\n/* Hide \"My Account\" links from the User Profile Menu */\n.profileMenu__links a[href*=\"profile\"],\n.profileMenu__links a[href*=\"my-account\"],\n.userProfileMenu a[title*=\"My Account\"],\n.userProfileMenu a[href*=\"profile\"],\n.selfServiceUserProfileMenu a[href*=\"profile\"] {\n    display: none !important;\n}",
+  "developerName" : "cpt",
+  "id" : "16028b26-7dde-443e-a7f3-54bad622eb24",
+  "label" : "Customer Account Portal",
+  "layouts" : {
+    "Inner" : "c961bbec-9cd1-4edb-9d3d-737e7fbcdee9",
+    "Login" : "f8595e11-255d-41f1-ad87-29f2bc52b48a",
+    "ServiceNotAvailable" : "a9bdc8fb-defc-4454-a6d7-cce565f2153a"
+  },
+  "type" : "theme",
+  "views" : [ {
+    "componentAttributes" : { },
+    "componentName" : "salesforceIdentity:loginBody2",
+    "id" : "f8595e11-255d-41f1-ad87-29f2bc52b48a",
+    "label" : "Login",
+    "regions" : [ {
+      "id" : "3ba3cfe2-0201-4a9e-8785-ab2ec81219a9",
+      "regionName" : "header",
+      "type" : "region"
+    }, {
+      "id" : "4787008d-4e04-40dd-b33d-f878c6c93021",
+      "regionName" : "content",
+      "type" : "region"
+    }, {
+      "id" : "11abdc53-ae13-4f19-a543-414940f12580",
+      "regionName" : "footer",
+      "type" : "region"
+    } ],
+    "type" : "view"
+  }, {
+    "componentAttributes" : {
+      "IsDefaultHeaderHidden" : false,
+      "IsDefaultHeaderPositionFixed" : false,
+      "IsDefaultNotificationsHidden" : false,
+      "IsSearchBarHidden" : true,
+      "fixedPageWidth" : 1920,
+      "isPageWidthFixed" : true
+    },
+    "componentName" : "siteforce:cptBody",
+    "id" : "c961bbec-9cd1-4edb-9d3d-737e7fbcdee9",
+    "label" : "Default",
+    "regions" : [ {
+      "id" : "1ff2443c-d978-4b82-85d4-2afac87c7fff",
+      "regionName" : "customHeader",
+      "type" : "region"
+    }, {
+      "components" : [ {
+        "componentAttributes" : {
+          "maxAutoCompleteResults" : 5,
+          "searchLabel" : "Search...",
+          "searchObjects" : [ {
+            "isPublic" : true,
+            "name" : "KnowledgeArticleVersion"
+          }, {
+            "isPublic" : false,
+            "name" : "Case"
+          }, {
+            "isPublic" : true,
+            "name" : "ContentDocument"
+          } ]
+        },
+        "componentName" : "forceCommunity:globalSearchInput",
+        "id" : "d2ce8ba7-ad3f-4dfe-b0fe-cc24042ad4e7",
+        "renditionMap" : { },
+        "type" : "component"
+      } ],
+      "id" : "faf81820-1ccd-46f8-86aa-9d0fb022d012",
+      "regionName" : "search",
+      "type" : "region"
+    }, {
+      "components" : [ {
+        "componentAttributes" : {
+          "accountManagementLabel" : "Account Management",
+          "communityBuilderLabel" : "Experience Builder",
+          "communitySetupLabel" : "Salesforce Setup",
+          "contactSupportLabel" : "Contact Support",
+          "filterName" : "MyCases",
+          "homeLabel" : "Home",
+          "includeContactSupport" : false,
+          "includeMessages" : false,
+          "loginLabel" : "Login",
+          "logoutLabel" : "Logout",
+          "myAccountLabel" : "My Account",
+          "showAccountManagement" : false,
+          "showUserSettings" : false,
+          "userSettingsLabel" : "My Settings",
+          "viewProfileLabel" : "My Profile"
+        },
+        "componentName" : "selfService:userProfileMenu",
+        "id" : "1a18bc2f-6229-49cb-9d24-7b5cfcb360a4",
+        "renditionMap" : { },
+        "type" : "component"
+      } ],
+      "id" : "7157ea0a-464a-4b1d-a5e8-e6e764eed8fa",
+      "regionName" : "profileMenu",
+      "type" : "region"
+    }, {
+      "components" : [ {
+        "componentAttributes" : {
+          "NavigationMenuEditorRefresh" : "",
+          "hideAppLauncher" : true,
+          "hideHomeText" : false
+        },
+        "componentName" : "forceCommunity:globalNavigation",
+        "id" : "3739f8da-7780-4fda-b565-e43e5b6026b8",
+        "renditionMap" : { },
+        "type" : "component"
+      } ],
+      "id" : "f60ee6f7-f880-4984-b8da-6c9b701d7d6c",
+      "regionName" : "navBar",
+      "type" : "region"
+    }, {
+      "id" : "aab825c5-970b-48d5-b12b-a3ff5340b656",
+      "regionName" : "customRegion",
+      "type" : "region"
+    }, {
+      "id" : "ca2599c7-2d32-4edd-9639-398e99bec18d",
+      "regionName" : "footer",
+      "type" : "region"
+    } ],
+    "type" : "view"
+  }, {
+    "componentAttributes" : {
+      "fixedPageWidth" : 1170,
+      "headerBgColor" : "rgba(0, 0, 0, 0)",
+      "isHeaderPinned" : false,
+      "isHeroUnderHeader" : false,
+      "isPageWidthFixed" : true,
+      "showHeader" : true,
+      "showHero" : true
+    },
+    "componentName" : "siteforce:themeLayoutStarter",
+    "id" : "a9bdc8fb-defc-4454-a6d7-cce565f2153a",
+    "label" : "ServiceNotAvailable",
+    "regions" : [ {
+      "id" : "c3f090a6-5f51-4343-b9db-4b916fb88d96",
+      "regionName" : "themeHeader",
+      "type" : "region"
+    }, {
+      "id" : "1451ffc2-1e26-40c7-a3c2-4137319c6a2c",
+      "regionName" : "themeFooter",
+      "type" : "region"
+    } ],
+    "type" : "view"
+  } ]
+}

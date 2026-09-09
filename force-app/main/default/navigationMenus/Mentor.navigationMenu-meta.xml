@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NavigationMenu xmlns="http://soap.sforce.com/2006/04/metadata">
+    <container>CloudNextGen Edvance</container>
+    <containerType>Network</containerType>
+    <label>Mentor</label>
+    <navigationMenuItem>
+        <label>Attendance</label>
+        <position>1</position>
+        <publiclyAvailable>true</publiclyAvailable>
+        <target>/attendance</target>
+        <type>InternalLink</type>
+    </navigationMenuItem>
+    <navigationMenuItem>
+        <label>Dashboard</label>
+        <position>2</position>
+        <publiclyAvailable>true</publiclyAvailable>
+        <target>/dashboard</target>
+        <type>InternalLink</type>
+    </navigationMenuItem>
+    <navigationMenuItem>
+        <label>Learning Documents</label>
+        <position>3</position>
+        <publiclyAvailable>false</publiclyAvailable>
+        <target>/learning-documents</target>
+        <type>InternalLink</type>
+    </navigationMenuItem>
+    <navigationMenuItem>
+        <label>Training Plan</label>
+        <position>4</position>
+        <publiclyAvailable>true</publiclyAvailable>
+        <target>/training-plan</target>
+        <type>InternalLink</type>
+    </navigationMenuItem>
+    <navigationMenuItem>
+        <label>All Requests</label>
+        <position>5</position>
+        <publiclyAvailable>true</publiclyAvailable>
+        <target>/all-requests</target>
+        <type>InternalLink</type>
+    </navigationMenuItem>
+</NavigationMenu>

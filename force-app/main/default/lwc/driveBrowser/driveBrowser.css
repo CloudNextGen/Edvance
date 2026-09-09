@@ -1,0 +1,147 @@
+.drive-browser {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    max-width: 100%;
+    padding: 1.5rem 0;
+}
+
+.drive-breadcrumb {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+}
+
+.crumb-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.crumb-link {
+    background: none;
+    border: none;
+    color: #7C6FD4;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    font-size: 0.9rem;
+}
+
+.crumb-link:hover {
+    text-decoration: underline;
+}
+
+.crumb-sep {
+    color: #A0A5C2;
+}
+
+.crumb-current {
+    font-weight: 700;
+    color: #1A1D3B;
+}
+
+.drive-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1rem;
+    gap: 1rem;
+}
+
+.drive-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #E2E6EE;
+    border-top-color: #7C6FD4;
+    border-radius: 50%;
+    animation: drive-spin 0.8s linear infinite;
+}
+
+@keyframes drive-spin {
+    to { transform: rotate(360deg); }
+}
+
+.drive-error {
+    background: #FFF3F0;
+    border: 1px solid #F5C7BA;
+    border-radius: 12px;
+    padding: 1.25rem;
+    color: #B14A2E;
+    font-size: 0.9rem;
+}
+
+.drive-empty {
+    background: #F8F9FD;
+    border: 1px dashed #E2E6EE;
+    border-radius: 14px;
+    padding: 2rem;
+    text-align: center;
+    color: #5C6285;
+}
+
+.drive-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.drive-row {
+    background: #FFFFFF;
+    border: 1px solid #E2E6EE;
+    border-radius: 14px;
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    cursor: pointer;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.drive-row:hover {
+    border-color: #7C6FD4;
+    box-shadow: 0 4px 14px rgba(26,29,59,0.06);
+}
+
+.drive-icon-wrap {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: #F1EFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.drive-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.drive-name {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: #1A1D3B;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.drive-meta {
+    font-size: 0.8rem;
+    color: #5C6285;
+    margin: 0.2rem 0 0;
+}
+
+.drive-action {
+    flex-shrink: 0;
+    color: #7C6FD4;
+    font-weight: 700;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+}

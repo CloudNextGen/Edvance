@@ -1,0 +1,51 @@
+<template>
+    <div class="comment-thread">
+        <p class="comment-thread-label">Comments</p>
+
+        <template if:true={errorMessage}>
+            <div class="alert_error">{errorMessage}</div>
+        </template>
+
+        <template if:true={isLoading}>
+            <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+        </template>
+
+        <template if:false={isLoading}>
+            <template if:true={hasComments}>
+                <div class="comment-list">
+                    <template for:each={comments} for:item="c">
+                        <div key={c.id} class="comment-item">
+                            <p class="comment-meta">
+                                <span class="comment-author">{c.authorName}</span>
+                                <span class="comment-date">• {c.date}</span>
+                            </p>
+                            <p class="comment-body">{c.body}</p>
+                        </div>
+                    </template>
+                </div>
+            </template>
+            <template if:false={hasComments}>
+                <p class="comment-empty">No comments yet.</p>
+            </template>
+        </template>
+
+        <div class="comment-composer">
+            <lightning-textarea
+                label="Add a comment"
+                value={newComment}
+                onchange={handleCommentChange}
+                disabled={isPosting}
+                variant="label-hidden"
+                placeholder="Write a comment..."
+            ></lightning-textarea>
+
+            <!-- Show button only when showSubmitButton is true -->
+            <template if:true={showSubmitButton}>
+                <button class="secondary-btn comment-post-btn" onclick={handlePostComment} disabled={isPostDisabled}>
+                    <template if:false={isPosting}>Post Comment</template>
+                    <template if:true={isPosting}>Posting...</template>
+                </button>
+            </template>
+        </div>
+    </div>
+</template>

@@ -1,0 +1,255 @@
+<template>
+    <div class="attendance-widget">
+
+        <template if:true={isLoading}>
+            <div class="loading-wrap">
+                <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+            </div>
+        </template>
+
+        <template if:false={isLoading}>
+
+            <!-- Header / action card -->
+            <div class="action-card">
+                <div class="action-card__text">
+                    <p class="eyebrow">ATTENDANCE</p>
+                    <h2 class="heading">Today's Attendance</h2>
+                </div>
+
+                <template if:false={isDone}>
+                    <div class="punch-single-cta">
+                        <button type="button" class="primary-btn primary-btn_full" onclick={openPunchModal}
+                            disabled={isCapturing}>
+                            {nextPunchLabel} →
+                        </button>
+                    </div>
+                </template>
+
+                <template if:true={showPunchModal}>
+                    <div class="punch-modal-backdrop" onclick={closePunchModal}>
+                        <div class="punch-modal-sheet" onclick={stopPropagation}>
+                            <div class="punch-modal-header">
+                                <h2 class="punch-modal-title">Log Attendance</h2>
+                                <button class="punch-modal-close" onclick={closePunchModal}
+                                    aria-label="Close">✕</button>
+                            </div>
+                            <div class="punch-modal-body">
+                                <template for:each={displayEntries} for:item="entry">
+                                    <button key={entry.key} type="button" class="punch-option" data-type={entry.type}
+                                        onclick={handleCaptureFromModal} disabled={entry.disableButton}>
+                                        <lightning-icon icon-name={entry.iconName} size="small"></lightning-icon>
+                                        <span class="punch-option-label">
+                                            <template if:true={entry.completed}>✓ {entry.label}</template>
+                                            <template if:false={entry.completed}>{entry.label}</template>
+                                        </span>
+                                        <span class="punch-option-badge">{entry.badgeText}</span>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <template if:true={isDone}>
+                    <span class="done-pill">✓ Day completed</span>
+                </template>
+            </div>
+
+            <!-- Messages -->
+            <template if:true={resultMessage}>
+                <p class="alert alert_success">{resultMessage}</p>
+            </template>
+            <template if:true={errorMessage}>
+                <p class="alert alert_error">{errorMessage}</p>
+            </template>
+
+            <!-- Today's record list -->
+            <div class="record-list">
+                <template for:each={displayEntries} for:item="entry">
+                    <div key={entry.key} class={entry.rowClass}>
+                        <div class="punch-row__left">
+                            <div class="icon-circle">
+                                <lightning-icon icon-name={entry.iconName} size="x-small"></lightning-icon>
+                            </div>
+                            <div>
+                                <p class="punch-label">{entry.label}</p>
+                                <p class="punch-time">{entry.formattedTime}</p>
+                            </div>
+                        </div>
+
+                        <div class="punch-row__right">
+                            <span class={entry.badgeClass}>{entry.badgeText}</span>
+
+                            <template if:true={entry.canAppeal}>
+                                <button class="link-btn" data-id={entry.id} onclick={handleOpenAppeal}>Appeal</button>
+                            </template>
+                        </div>
+
+                        <template if:true={entry.isAppealOpen}>
+                            <div class="appeal-box">
+                                <textarea class="appeal-textarea"
+                                    placeholder="Reason for being late (e.g. informed manager in advance)…"
+                                    onchange={handleAppealTextChange}></textarea>
+                                <div class="appeal-actions">
+                                    <button class="secondary-btn" onclick={handleCancelAppeal}
+                                        disabled={isSubmittingAppeal}>
+                                        Cancel
+                                    </button>
+                                    <button class="primary-btn primary-btn_small" data-id={entry.id}
+                                        onclick={handleSubmitAppeal} disabled={isSubmittingAppeal}>
+                                        Submit Appeal
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+            </div>
+
+            <template if:true={showCameraModal}>
+                <div class="punch-modal-backdrop" onclick={stopPropagation}>
+                    <div class="punch-modal-sheet camera-sheet" onclick={stopPropagation}>
+                        <div class="punch-modal-header">
+                            <h2 class="punch-modal-title">Take Photo</h2>
+                            <button class="punch-modal-close" onclick={handleCancelCamera} aria-label="Close">✕</button>
+                        </div>
+
+                        <div class="camera-body">
+                            <template if:false={isPhotoConfirmStep}>
+                                <video class="camera-video" autoplay playsinline muted></video>
+                                <template if:true={cameraErrorMessage}>
+                                    <p class="alert alert_error">{cameraErrorMessage}</p>
+                                </template>
+                                <button type="button" class="primary-btn primary-btn_full" onclick={handleCaptureFrame}
+                                    disabled={cameraErrorMessage}>
+                                    Capture
+                                </button>
+                            </template>
+
+                            <template if:true={isPhotoConfirmStep}>
+                                <img src={capturedPhotoDataUrl} class="camera-preview-img"
+                                    alt="Captured photo preview" />
+                                <div class="camera-confirm-actions">
+                                    <button class="secondary-btn" onclick={handleRetake}
+                                        disabled={isCapturing}>Retake</button>
+                                    <button class="primary-btn" onclick={handleConfirmPhoto} disabled={isCapturing}>Use
+                                        This
+                                        Photo</button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Rounded Pill History Toggle Button -->
+            <div class="history-toggle-row">
+                <button class="history-toggle-pill-btn" onclick={handleToggleHistory}>
+                    <template if:false={showHistory}>View Full History &nbsp;▾</template>
+                    <template if:true={showHistory}>Hide History &nbsp;▴</template>
+                </button>
+            </div>
+
+            <template if:true={showHistory}>
+                <div class="history-section">
+
+                    <!-- KPI Metric Summary Cards -->
+                    <div class="kpi-cards-grid">
+                        <div class="kpi-card">
+                            <span class="kpi-title">Total Days Tracked</span>
+                            <span class="kpi-value">{historyTotalCount}</span>
+                        </div>
+                        <div class="kpi-card">
+                            <span class="kpi-title">Total Late Occurrences</span>
+                            <span class="kpi-value">{totalLateCount}</span>
+                        </div>
+                        <div class="kpi-card">
+                            <span class="kpi-title">Total Deductions</span>
+                            <span class="kpi-value">₹{totalDeductionAmount}</span>
+                        </div>
+                    </div>
+
+                    <div class="filter-bar">
+                        <div class="filter-field">
+                            <label for="histStart">From</label>
+                            <input id="histStart" type="date" value={historyStartDate}
+                                onchange={handleHistoryStartDateChange} />
+                        </div>
+                        <div class="filter-field">
+                            <label for="histEnd">To</label>
+                            <input id="histEnd" type="date" value={historyEndDate}
+                                onchange={handleHistoryEndDateChange} />
+                        </div>
+                        <label class="checkbox-field">
+                            <input type="checkbox" checked={historyLateOnly} onchange={handleHistoryLateOnlyChange} />
+                            Late days only
+                        </label>
+                        <button class="primary-btn primary-btn_small" onclick={handleApplyHistoryFilter}>Apply</button>
+                        <button class="export-btn" onclick={handleExport}>Export Data</button>
+                    </div>
+
+                    <template if:true={isHistoryLoading}>
+                        <div class="loading-wrap">
+                            <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+                        </div>
+                    </template>
+
+                    <template if:true={historyErrorMessage}>
+                        <p class="alert alert_error">{historyErrorMessage}</p>
+                    </template>
+
+                    <template if:true={hasHistoryRows}>
+                        <div class="table-wrap">
+                            <table class="history-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Office In</th>
+                                        <th>Office Out</th>
+                                        <th>Lunch Out</th>
+                                        <th>Lunch In</th>
+                                        <th class="text-right">Office Late</th>
+                                        <th class="text-right">Lunch Late</th>
+                                        <th class="text-right">Deduction</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template for:each={historyRows} for:item="row">
+                                        <tr key={row.id}>
+                                            <td>{row.date}</td>
+                                            <td>{row.officeIn}</td>
+                                            <td>{row.officeOut}</td>
+                                            <td>{row.lunchOut}</td>
+                                            <td>{row.lunchIn}</td>
+                                            <td class="text-right">{row.officeLateMinutes}</td>
+                                            <td class="text-right">{row.lunchLateMinutes}</td>
+                                            <td class="text-right">₹{row.deduction}</td>
+                                            <td><span class={row.statusClass}>{row.statusText}</span></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </template>
+
+                    <template if:true={noHistoryRows}>
+                        <p class="empty-text">No attendance records found for this range.</p>
+                    </template>
+                    <template if:true={todayRecordErrorMessage}>
+                        <p class="alert alert_error">{todayRecordErrorMessage}</p>
+                    </template>
+
+                    <template if:true={hasHistoryRows}>
+                        <div class="history-pager">
+                            <button disabled={isFirstHistoryPage} onclick={handleHistoryPrevPage}>← Prev</button>
+                            <span>{historyPageLabel}</span>
+                            <button disabled={noMoreHistoryPages} onclick={handleHistoryNextPage}>Next →</button>
+                        </div>
+                    </template>
+                </div>
+            </template>
+
+        </template>
+    </div>
+</template>

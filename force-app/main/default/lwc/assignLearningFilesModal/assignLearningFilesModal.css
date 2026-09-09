@@ -1,0 +1,24 @@
+.slds-modal {
+    z-index: 9001;
+}
+
+.slds-modal__container {
+    max-width: 560px;
+}
+
+.slds-box {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    border-color: #e5e7eb;
+    border-radius: 8px;
+    transition: border-color 0.15s ease;
+}
+
+.slds-box:hover {
+    border-color: #7c3aed;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}

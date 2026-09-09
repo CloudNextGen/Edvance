@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomApplication xmlns="http://soap.sforce.com/2006/04/metadata">
+    <brand>
+        <headerColor>#0070D2</headerColor>
+        <shouldOverrideOrgTheme>false</shouldOverrideOrgTheme>
+    </brand>
+    <formFactors>Small</formFactors>
+    <formFactors>Large</formFactors>
+    <isNavAutoTempTabsDisabled>false</isNavAutoTempTabsDisabled>
+    <isNavPersonalizationDisabled>false</isNavPersonalizationDisabled>
+    <isNavTabPersistenceDisabled>false</isNavTabPersistenceDisabled>
+    <isOmniPinnedViewEnabled>false</isOmniPinnedViewEnabled>
+    <label>Smart Learning</label>
+    <navType>Standard</navType>
+    <tabs>Learning_Folder__c</tabs>
+    <tabs>Learning_File__c</tabs>
+    <tabs>Learning_Access__c</tabs>
+    <tabs>Attendance_Summary__c</tabs>
+    <tabs>Attendance_Log__c</tabs>
+    <tabs>Error_Log__c</tabs>
+    <uiType>Lightning</uiType>
+</CustomApplication>

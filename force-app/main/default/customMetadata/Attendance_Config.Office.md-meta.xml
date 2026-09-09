@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <label>Office</label>
+    <protected>false</protected>
+    <values>
+        <field>Allowed_Radius_Meters__c</field>
+        <value xsi:type="xsd:double">15.0</value>
+    </values>
+    <values>
+        <field>Latitude__c</field>
+        <value xsi:type="xsd:double">27.4943323</value>
+    </values>
+    <values>
+        <field>Longitude__c</field>
+        <value xsi:type="xsd:double">77.6697313</value>
+    </values>
+    <values>
+        <field>Lunch_Duration_Minutes__c</field>
+        <value xsi:type="xsd:double">45.0</value>
+    </values>
+    <values>
+        <field>Need_Lunch_Photo__c</field>
+        <value xsi:type="xsd:boolean">false</value>
+    </values>
+    <values>
+        <field>Office_Name__c</field>
+        <value xsi:type="xsd:string">CloudNextGen</value>
+    </values>
+    <values>
+        <field>Office_Start_Time__c</field>
+        <value xsi:type="xsd:string">10:30</value>
+    </values>
+</CustomMetadata>

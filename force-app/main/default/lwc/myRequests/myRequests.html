@@ -1,0 +1,111 @@
+<template>
+    <div class="requests-widget">
+        <template if:true={isLoading}>
+            <div class="loading-wrap">
+                <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+            </div>
+        </template>
+
+        <template if:false={isLoading}>
+            <div class="header-row">
+                <div>
+                    <p class="eyebrow">Support</p>
+                    <h2 class="heading">My Requests</h2>
+                </div>
+                <div class="header-actions">
+                    <button class="secondary-btn refresh-btn" onclick={handleRefresh} disabled={isRefreshing}>
+                        <template if:false={isRefreshing}>↻ Refresh</template>
+                        <template if:true={isRefreshing}>Refreshing...</template>
+                    </button>
+                    <button class="primary-btn" onclick={handleOpenModal}>+ New Request</button>
+                </div>
+            </div>
+
+            <template if:true={hasError}>
+                <div class="alert alert_error">{errorMessage}</div>
+            </template>
+
+            <template if:true={hasRequests}>
+                <div class="record-list">
+                    <template for:each={displayRequests} for:item="req">
+                        <div key={req.id} class={req.rowClass}>
+                            <div class="request-row__main" data-id={req.id} onclick={handleRowToggle}>
+                                <div class="request-row__left">
+                                    <p class="request-subject">{req.subject}</p>
+                                    <p class="request-date">Raised {req.date}</p>
+                                </div>
+                                <div class="request-row__right">
+                                    <span class={req.badgeClass}>{req.statusLabel}</span>
+                                    <svg class={req.chevronClass} viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+                                        <path d="M5 7l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <template if:true={req.isExpanded}>
+                                <div class="request-row__detail">
+                                    <p class="request-detail-label">Description</p>
+                                    <p class="request-detail-text">{req.description}</p>
+                                    <c-case-comment-thread record-id={req.id} show-submit-button="true"></c-case-comment-thread>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </template>
+
+            <template if:true={noRequests}>
+                <p class="empty-text">You haven't raised any requests yet.</p>
+            </template>
+        </template>
+
+        <template if:true={isModalOpen}>
+            <div class="modal-backdrop" onclick={handleCloseModal}>
+                <div class="modal-card" onclick={handleModalContentClick} role="dialog" aria-modal="true" aria-labelledby="new-request-title">
+                    <div class="modal-header">
+                        <h3 class="modal-title" id="new-request-title">New Request</h3>
+                        <button class="modal-close-btn" onclick={handleCloseModal} aria-label="Close" disabled={isSubmitting}>&times;</button>
+                    </div>
+
+                    <div class="modal-body">
+                        <template if:true={hasFormError}>
+                            <div class="alert alert_error">{formError}</div>
+                        </template>
+
+                        <lightning-combobox
+                            label="Request Type"
+                            placeholder="Select a request type"
+                            value={formRequestType}
+                            options={requestTypeOptions}
+                            onchange={handleTypeChange}
+                            disabled={isSubmitting}
+                        ></lightning-combobox>
+
+                        <lightning-input
+                            label="Subject (optional)"
+                            value={formSubject}
+                            onchange={handleSubjectChange}
+                            disabled={isSubmitting}
+                            class="modal-field"
+                        ></lightning-input>
+
+                        <lightning-textarea
+                            label="Description"
+                            value={formDescription}
+                            onchange={handleDescriptionChange}
+                            disabled={isSubmitting}
+                            class="modal-field"
+                        ></lightning-textarea>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button class="secondary-btn" onclick={handleCloseModal} disabled={isSubmitting}>Cancel</button>
+                        <button class="primary-btn" onclick={handleSubmit} disabled={isSubmitDisabled}>
+                            <template if:false={isSubmitting}>Submit</template>
+                            <template if:true={isSubmitting}>Submitting...</template>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+</template>

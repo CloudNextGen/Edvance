@@ -1,0 +1,241 @@
+<template>
+    <div class="lc-engine">
+        <div class="screen">
+
+            <template if:true={showRootHero}>
+                <div class="hero regular-hero hero-layout">
+                    <div class="hero-copy">
+                        <span class="eyebrow">Learning Library</span>
+                        <h1 class="hero-title">Learning Content</h1>
+                        <p class="hero-sub">Browse materials that have been shared with you.</p>
+                    </div>
+
+                    <div class="hero-svg-wrap" aria-hidden="true">
+                        <img src={backgroundImageUrl} class="responsive-svg" alt="Learning documents illustration" />
+                    </div>
+                </div>
+            </template>
+
+            <template if:true={showBackBar}>
+                <div class="topbar">
+                    <button class="btn-back" onclick={handleBackClick}>
+                        <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
+                        <span>Back</span>
+                    </button>
+                </div>
+
+                <nav class="lc-breadcrumbs">
+                    <a data-id="root" onclick={handleBreadcrumbClick}>Learning Content</a>
+                    <template for:each={breadcrumbs} for:item="crumb">
+                        <span key={crumb.id} class="crumb-wrap">
+                            <span class="crumb-sep">/</span>
+                            <a data-id={crumb.id} onclick={handleBreadcrumbClick}>{crumb.name}</a>
+                        </span>
+                    </template>
+                </nav>
+            </template>
+
+            <template if:true={isLoading}>
+                <div class="loading-panel">
+                    <div class="loading-ring"></div>
+                    <p class="loading-text">Loading content…</p>
+                </div>
+            </template>
+
+            <template if:true={error}>
+                <div class="lc-error">Couldn't load content: {error}</div>
+            </template>
+
+            <template if:false={isLoading}>
+                <template if:true={isEmpty}>
+                    <div class="lc-empty">
+                        <p>Nothing has been shared with you here yet.</p>
+                    </div>
+                </template>
+
+                <div class="category-grid">
+                    <template for:each={displayFolders} for:item="folder">
+                        <div
+                            key={folder.id}
+                            class={folder.cardClass}
+                            data-id={folder.id}
+                            onclick={handleFolderClick}
+                            tabindex="0">
+                            <div class="cat-card-top">
+                                <div class={folder.iconClass}>
+                                    <lightning-icon icon-name={folder.iconName} size="small"></lightning-icon>
+                                </div>
+                                <p class="cat-name">{folder.name}</p>
+                            </div>
+                            <p class="cat-desc">{folder.countsLabel}</p>
+                            <div class="cat-footer">
+                                <div class="cat-arrow">
+                                    <lightning-icon icon-name="utility:forward" size="xx-small"></lightning-icon>
+                                </div>
+                                <span class="cat-cta">Open folder</span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <template if:true={showRootHero}>
+                    <div class="how-strip">
+                        <p class="how-heading">How it works</p>
+                        <div class="how-steps">
+                            <div class="how-step">
+                                <div class="how-step-icon how-icon-1"><span class="how-emoji">📁</span></div>
+                                <div class="how-step-content">
+                                    <p class="how-step-title"><span class="how-num how-num-1">1</span>Open a folder</p>
+                                    <p class="how-step-desc">Browse the learning folders shared with you and choose the topic you want to explore.</p>
+                                </div>
+                            </div>
+
+                            <div class="how-arrow">›</div>
+
+                            <div class="how-step">
+                                <div class="how-step-icon how-icon-2"><span class="how-emoji">📄</span></div>
+                                <div class="how-step-content">
+                                    <p class="how-step-title"><span class="how-num how-num-2">2</span>Open a document</p>
+                                    <p class="how-step-desc">Select a document to view it and start the learning experience.</p>
+                                </div>
+                            </div>
+
+                            <div class="how-arrow">›</div>
+
+                            <div class="how-step">
+                                <div class="how-step-icon how-icon-3"><span class="how-emoji">✅</span></div>
+                                <div class="how-step-content">
+                                    <p class="how-step-title"><span class="how-num how-num-3">3</span>Mark it complete</p>
+                                    <p class="how-step-desc">Once you finish, mark the document complete to unlock the next available content.</p>
+                                </div>
+                            </div>
+
+                            <div class="how-arrow">›</div>
+
+                            <div class="how-step">
+                                <div class="how-step-icon how-icon-4"><span class="how-emoji">🔓</span></div>
+                                <div class="how-step-content">
+                                    <p class="how-step-title"><span class="how-num how-num-4">4</span>Continue the path</p>
+                                    <p class="how-step-desc">Progress through the folders and documents in sequence as more content becomes available.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <div class="asm-list">
+                    <template for:each={displayFiles} for:item="file">
+                        <div key={file.id} class="asm-row" data-file-id={file.id}>
+                            <div class="asm-icon-wrap asm-icon-eligible">
+                                <lightning-icon icon-name={file.iconName} size="small"></lightning-icon>
+                            </div>
+                            <div class="asm-info">
+                                <p class="asm-name">{file.name}</p>
+                                <p class="asm-meta">
+                                    <span>{file.sizeLabel}</span>
+                                    <template if:true={file.estimatedTimeMinutes}>
+                                        <span class="status-badge status-time">⏱ {file.estimatedTimeMinutes} min</span>
+                                    </template>
+                                    <template if:true={file.isCompleted}>
+                                        <span class="status-badge status-completed">✓ Completed</span>
+                                    </template>
+                                    <template if:true={file.isAccessRevoked}>
+                                        <span class="status-badge status-revoked">Access revoked</span>
+                                    </template>
+                                </p>
+                            </div>
+                            <div class="file-actions">
+                                <template if:false={file.isAccessRevoked}>
+                                    <template if:true={file.hasBeenOpened}>
+                                        <template if:false={file.isCompleted}>
+                                            <template if:false={file.timeExpired}>
+                                                <div class="timer-display" title="Time remaining to mark as complete">
+                                                    <span class="timer-icon">⏳</span>
+                                                    <span class="timer-text">{file.timerDisplay}</span>
+                                                </div>
+                                            </template>
+                                            <template if:true={file.timeExpired}>
+                                                <button
+                                                    class="btn-asm btn-asm-complete"
+                                                    onclick={handleCompleteFile}
+                                                    data-file-id={file.id}
+                                                    title="Click to mark file as complete and unlock next file">
+                                                    Mark as Completed
+                                                </button>
+                                            </template>
+                                        </template>
+                                    </template>
+                                </template>
+                                <template if:true={file.isAccessRevoked}>
+                                    <button
+                                        class="btn-asm btn-asm-start"
+                                        disabled>
+                                        Access revoked
+                                    </button>
+                                </template>
+                                <template if:false={file.isAccessRevoked}>
+                                    <button
+                                        class="btn-asm btn-asm-start"
+                                        onclick={handleFileClick}
+                                        data-url={file.webViewLink}
+                                        data-file-id={file.id}>
+                                        Open →
+                                    </button>
+                                </template>
+                            </div>
+                            <button
+                                class="btn-feedback-icon"
+                                onclick={handleFeedbackIconClick}
+                                data-file-id={file.id}
+                                title="Give feedback">
+                                <lightning-icon icon-name="utility:chat" size="xx-small"></lightning-icon>
+                            </button>
+                        </div>
+                    </template>
+                </div>
+
+                <template if:true={showNextLessonButton}>
+                    <div class="next-lesson-wrap">
+                        <button class="btn-next-lesson" onclick={handleNextLessonClick}>
+                            Click here for next lesson →
+                        </button>
+                    </div>
+                </template>
+
+                <template if:true={showPathCompleteMessage}>
+                    <div class="path-complete-banner">
+                        You've completed everything in this path. Nice work!
+                    </div>
+                </template>
+
+                <template if:true={showAccessGapMessage}>
+                    <div class="path-warning-banner">
+                        ⚠️ {accessGapMessage}
+                    </div>
+                </template>
+
+            </template>
+            <template if:true={showFeedbackModal}>
+                <div class="feedback-modal-overlay" onclick={handleFeedbackCancel}>
+                    <div class="feedback-modal" onclick={stopPropagation}>
+                        <p class="feedback-modal-title">Feedback on "{feedbackFileName}"</p>
+                        <textarea
+                            class="feedback-textarea"
+                            placeholder="Share your feedback about this document..."
+                            value={feedbackComment}
+                            oninput={handleFeedbackCommentChange}>
+                        </textarea>
+                        <template if:true={feedbackModalError}>
+                            <p class="feedback-modal-error">{feedbackModalError}</p>
+                        </template>
+                        <div class="feedback-modal-actions">
+                            <button class="btn-feedback-cancel" onclick={handleFeedbackCancel} disabled={isFeedbackSubmitting}>Cancel</button>
+                            <button class="btn-feedback-submit" onclick={handleFeedbackSubmit} disabled={isFeedbackSubmitting}>Submit</button>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+        </div>
+    </div>
+</template>

@@ -1,0 +1,624 @@
+<template>
+    <div class="qa-engine">
+
+        <!-- Sticky violation warning banner: stays until closed, auto-hides after 1 minute -->
+        <template if:true={bannerVisible}>
+            <div class={bannerClass} role="alert">
+                <div class="violation-banner-icon">
+                    <lightning-icon icon-name="utility:warning" size="small"></lightning-icon>
+                </div>
+                <div class="violation-banner-text">
+                    <p class="violation-banner-title">{bannerTitle}</p>
+                    <p class="violation-banner-message">{bannerMessage}</p>
+                </div>
+                <button class="violation-banner-close" onclick={handleCloseBanner} aria-label="Close warning">×</button>
+            </div>
+        </template>
+
+        <template if:true={showCategoryScreen}>
+            <div class="screen">
+
+                <div class="hero">
+                    <div class="hero-left">
+                        <span class="eyebrow">Assessment Library</span>
+                        <h1 class="hero-title">Pick a topic</h1>
+                        <p class="hero-sub">Explore ready-to-use assessments by topic.</p>
+
+                        <div class="hero-badges">
+                            <template for:each={featureBadges} for:item="b">
+                                <div key={b.label} class="hero-badge">
+                                    <div class="hero-badge-icon">
+                                        <lightning-icon icon-name={b.icon} size="xx-small"></lightning-icon>
+                                    </div>
+                                    <div class="hero-badge-text">
+                                        <p class="hero-badge-label">{b.label}</p>
+                                        <p class="hero-badge-sub">{b.sub}</p>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="hero-svg-wrap" aria-hidden="true">
+                        <img src={backgroundImageUrl} class="responsive-svg" alt="Background Graphic" />
+                    </div>
+                </div>
+
+                <template if:true={isEmpty}>
+                    <div class="ac-empty">
+                        <p>No assignment is assigned to you, Please check back later.</p>
+                    </div>
+                </template>
+
+                <div class="category-grid">
+                    <template for:each={categories} for:item="cat">
+                        <div key={cat.Id}
+                            class={cat.cardClass}
+                            data-id={cat.Id}
+                            data-name={cat.Name}
+                            onclick={handleCategoryClick}
+                            tabindex="0">
+
+                            <div class="cat-card-top">
+                                <div class={cat.iconClass}>
+                                    <lightning-icon icon-name={cat.iconName} size="small"></lightning-icon>
+                                </div>
+                                <p class="cat-name">{cat.Name}</p>
+                            </div>
+
+                            <p class="cat-desc">{cat.description}</p>
+
+                            <div class="cat-footer">
+                                <div class="cat-arrow">
+                                    <lightning-icon icon-name="utility:forward" size="xx-small"></lightning-icon>
+                                </div>
+                                <span class="cat-cta">Open category</span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="how-strip">
+                    <p class="how-heading">How it works</p>
+                    <div class="how-steps">
+                        <div class="how-step">
+                            <div class="how-step-icon how-icon-1"><span class="how-emoji">📚</span></div>
+                            <div class="how-step-content">
+                                <p class="how-step-title"><span class="how-num how-num-1">1</span>Pick a topic</p>
+                                <p class="how-step-desc">Choose any available subject category and select a topic to begin.</p>
+                            </div>
+                        </div>
+
+                        <div class="how-arrow">›</div>
+
+                        <div class="how-step">
+                            <div class="how-step-icon how-icon-2"><span class="how-emoji">✍️</span></div>
+                            <div class="how-step-content">
+                                <p class="how-step-title"><span class="how-num how-num-2">2</span>Answer questions</p>
+                                <p class="how-step-desc">Work through questions at your own pace — your answers save as you go.</p>
+                            </div>
+                        </div>
+
+                        <div class="how-arrow">›</div>
+
+                        <div class="how-step">
+                            <div class="how-step-icon how-icon-3"><span class="how-emoji">🤖</span></div>
+                            <div class="how-step-content">
+                                <p class="how-step-title"><span class="how-num how-num-3">3</span>Get AI feedback</p>
+                                <p class="how-step-desc">Submit to receive instant AI-graded scores and detailed feedback per question.</p>
+                            </div>
+                        </div>
+
+                        <div class="how-arrow">›</div>
+
+                        <div class="how-step">
+                            <div class="how-step-icon how-icon-4"><span class="how-emoji">🔓</span></div>
+                            <div class="how-step-content">
+                                <p class="how-step-title"><span class="how-num how-num-4">4</span>Unlock the next</p>
+                                <p class="how-step-desc">Completing a topic unlocks the next one in the sequence automatically.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </template>
+
+        <template if:true={isLoading}>
+            <div class="loading-panel">
+                <div class="loading-ring"></div>
+                <p class="loading-text">Saving your work…</p>
+            </div>
+        </template>
+
+        <template if:true={showAssignmentScreen}>
+            <div class="screen">
+                <div class="topbar">
+                    <button class="btn-back" onclick={navBackToCategories}>
+                        <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
+                        <span>All categories</span>
+                    </button>
+                </div>
+
+                <div class="hero regular-hero">
+                    <div class="hero-text">
+                        <span class="eyebrow">{selectedCategoryName}</span>
+                        <h1 class="hero-title">What's next</h1>
+                        <p class="hero-sub">Choose a topic below to start your assessment.</p>
+                    </div>
+                </div>
+
+                <div class="page-nav-row slds-m-bottom_medium">
+                    <div class="quiz-page-nav">
+                        <button class="btn-page-nav" onclick={handlePrevAssignmentPage} disabled={isFirstAssignmentPage}>
+                            <lightning-icon icon-name="utility:chevronleft" size="xx-small"></lightning-icon>
+                        </button>
+                        <span class="quiz-page-pill">{assignmentPageIndicatorLabel}</span>
+                        <button class="btn-page-nav" onclick={handleNextAssignmentPage} disabled={isLastAssignmentPage}>
+                            <lightning-icon icon-name="utility:chevronright" size="xx-small"></lightning-icon>
+                        </button>
+                    </div>
+                
+                    <button
+                        class="btn-refresh"
+                        onclick={handleRefreshAssignments}
+                        disabled={isRefreshingAssignments}>
+                        <lightning-icon
+                            icon-name="utility:refresh"
+                            size="xx-small"
+                            class={refreshIconClass}>
+                        </lightning-icon>
+                        <span>Refresh</span>
+                    </button>
+                </div>
+
+                <div class="asm-list">
+                    <template for:each={paginatedAssignments} for:item="asm">
+                        <template if:true={asm.isEligibleStatus}>
+                            <div key={asm.Id} class="asm-row">
+                                <div class="asm-icon-wrap asm-icon-eligible">
+                                    <lightning-icon icon-name="standard:document" size="small"></lightning-icon>
+                                </div>
+                                <div class="asm-info">
+                                    <p class="asm-name">{asm.Name}</p>
+                                    <p class="asm-meta">
+                                        <lightning-icon icon-name="utility:rows" size="xx-small"></lightning-icon>
+                                        <span>{asm.Total_Question_Count__c} questions</span>
+                                    </p>
+                                </div>
+                                <button
+                                    class="btn-asm btn-asm-start"
+                                    data-id={asm.Id}
+                                    data-title={asm.Name}
+                                    onclick={handleAssignmentClick}>
+                                    Start →
+                                </button>
+                            </div>
+                        </template>
+
+                        <template if:true={asm.isCompletedStatus}>
+                            <div key={asm.Id} class="asm-row asm-row-completed">
+                                <div class="asm-icon-wrap asm-icon-completed">
+                                    <lightning-icon icon-name="utility:check" size="small"></lightning-icon>
+                                </div>
+                                <div class="asm-info">
+                                    <p class="asm-name">{asm.Name}</p>
+                                    <p class="asm-meta">
+                                        <lightning-icon icon-name="utility:rows" size="xx-small"></lightning-icon>
+                                        <span>{asm.Total_Question_Count__c} questions</span>
+                                    </p>
+                                </div>
+                                <button
+                                    class="btn-asm btn-asm-completed"
+                                    data-id={asm.Id}
+                                    data-title={asm.Name}
+                                    onclick={handleViewAttempts}>
+                                    View results →
+                                </button>
+                            </div>
+                        </template>
+
+                        <template if:true={asm.isLockedStatus}>
+                            <div key={asm.Id} class="asm-row asm-row-locked">
+                                <div class="asm-icon-wrap asm-icon-locked">
+                                    <lightning-icon icon-name="utility:lock" size="small"></lightning-icon>
+                                </div>
+                                <div class="asm-info">
+                                    <p class="asm-name">{asm.Name}</p>
+                                    <p class="asm-meta">
+                                        <lightning-icon icon-name="utility:rows" size="xx-small"></lightning-icon>
+                                        <span>{asm.Total_Question_Count__c} questions</span>
+                                    </p>
+                                </div>
+                                <button class="btn-asm btn-asm-locked" disabled>
+                                    Locked
+                                </button>
+                            </div>
+                        </template>
+                    </template>
+                </div>
+            </div>
+        </template>
+
+        <template if:true={showAttemptsScreen}>
+            <div class="screen">
+                <div class="topbar">
+                    <button class="btn-back" onclick={navBackToAssignments}>
+                        <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
+                        <span>Back</span>
+                    </button>
+                </div>
+
+                <div class="hero regular-hero">
+                    <div class="hero-text">
+                        <span class="eyebrow">{selectedAssignmentTitle}</span>
+                        <h1 class="hero-title">Your attempts</h1>
+                        <p class="hero-sub">Select an attempt to review your answers and score.</p>
+                    </div>
+                </div>
+
+                <div class="asm-list">
+                    <template for:each={attempts} for:item="att">
+                        <div key={att.Id}
+                             class="asm-row attempt-row"
+                             data-id={att.Id}
+                             data-attempt={att.Attempt_Number__c}
+                             onclick={handleAttemptClick}
+                             tabindex="0">
+                            
+                            <div class="asm-icon-wrap asm-icon-attempt">
+                                <span class="attempt-num">{att.Attempt_Number__c}</span>
+                            </div>
+                            
+                            <div class="asm-info">
+                                <p class="asm-name">Attempt {att.Attempt_Number__c}</p>
+                                <p class="asm-meta">
+                                    <lightning-icon icon-name="utility:date_time" size="xx-small"></lightning-icon>
+                                    <lightning-formatted-date-time value={att.CreatedDate}></lightning-formatted-date-time>
+                                </p>
+                            </div>
+                            
+                            <!-- Score Container wrapping both the Pass/Fail badge and Score -->
+                            <div class="attempt-score-container slds-grid slds-grid_vertical-align-center">
+                                <template if:true={att.isLocked}>
+                                    <span class="locked-chip"
+                                          title={att.lockReason}>
+                                        <lightning-icon
+                                            icon-name="utility:lock"
+                                            size="xx-small">
+                                        </lightning-icon>
+                                        Locked
+                                    </span>
+                                </template>                            
+                                <span class={att.passFailClass}>{att.passFailLabel}</span>
+                                <span class="attempt-score-chip slds-m-left_small">{att.scoreLabel}</span>
+                            </div>
+
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+
+        <template if:true={showReviewScreen}>
+            <div class="screen">
+                <div class="topbar">
+                    <button class="btn-back" onclick={navBackToAttempts}>
+                        <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
+                        <span>All attempts</span>
+                    </button>
+                </div>
+
+                <div class="hero regular-hero">
+                    <div class="hero-text">
+                        <span class="eyebrow">{selectedAssignmentTitle}</span>
+                        <h1 class="hero-title">Attempt {selectedAttemptNumber} — Review</h1>
+                    </div>
+                </div>
+
+                <div class="question-stack">
+                    <template for:each={attemptDetail} for:item="q">
+                        <div key={q.Id} class="q-card">
+                            <div class="q-card-head">
+                                <div class="q-num-badge">{q.displayIndex}</div>
+                                <span class="q-label">Question {q.displayIndex}</span>
+                                <span class="q-score-chip">{q.AI_Grade__c} / {q.Max_Points__c} pts</span>
+                            </div>
+                            <p class="q-text">{q.Question_Text__c}</p>
+                            <div class="review-label">Your answer</div>
+                            <div class="review-answer">{q.User_Answer__c}</div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+
+        <template if:true={showInstructionsScreen}>
+            <div class="screen">
+                <div class="topbar">
+                    <button class="btn-back" onclick={navBackFromInstructions}>
+                        <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
+                        <span>Back</span>
+                    </button>
+                </div>
+        
+                <div class="hero regular-hero">
+                    <div class="hero-text">
+                        <span class="eyebrow">{selectedCategoryName}</span>
+                        <h1 class="hero-title">Before you begin</h1>
+                        <p class="hero-sub">{selectedAssignmentTitle} — please read the instructions below.</p>
+                    </div>
+                </div>
+        
+                <div class="instructions-card">
+                    <ul class="instructions-list">
+                        <li class="instructions-item">
+                            <span class="instructions-bullet">1</span>
+                            <span>Answer every question to the best of your ability — your responses are graded by AI.</span>
+                        </li>
+                        <li class="instructions-item">
+                            <span class="instructions-bullet">2</span>
+                            <span>Switching tabs or minimizing the window is tracked. 3 violations will auto-submit and fail this attempt.</span>
+                        </li>
+                        <li class="instructions-item">
+                            <span class="instructions-bullet">3</span>
+                            <span>Copy and paste are disabled in the answer boxes — please type your responses directly.</span>
+                        </li>
+                        <li class="instructions-item">
+                            <span class="instructions-bullet">4</span>
+                            <span>Once submitted, you cannot retake this assessment until it's unlocked again.</span>
+                        </li>
+                        <template if:true={selectedAssignmentTimeLimit}>
+                            <li class="instructions-item">
+                                <span class="instructions-bullet">5</span>
+                                <span>This assessment is timed. It will auto-submit when the countdown reaches zero.</span>
+                            </li>
+                        </template>
+                    </ul>
+        
+                    <button
+                        class="btn-begin-assessment"
+                        disabled={isStartDisabled}
+                        onclick={handleBeginAssessment}>
+                        {startButtonLabel}
+                    </button>
+                </div>
+            </div>
+        </template>
+
+        <template if:true={showQuestionScreen}>
+            <div class="screen">
+                <div class="quiz-topbar">
+                    <button class="btn-back" onclick={handleExitAssessment}>
+                        <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
+                        <span>Exit</span>
+                    </button>
+                    <div class="quiz-crumb">
+                        <span class="crumb-cat">{selectedCategoryName}</span>
+                        <lightning-icon icon-name="utility:chevronright" size="xx-small"></lightning-icon>
+                        <span class="crumb-asm">{selectedAssignmentTitle}</span>
+                    </div>
+                    <template if:true={showTimer}>
+                        <div class={timerClass}>
+                            <lightning-icon icon-name="utility:clock" size="xx-small"></lightning-icon>
+                            <span>{timerDisplay}</span>
+                        </div>
+                    </template>
+                    <template if:false={showTimer}>
+                        <div class="quiz-crumb-spacer"></div>
+                    </template>
+                </div>
+
+                <div class="quiz-progress-bar-wrap">
+                    <div class="quiz-prog-meta">
+                        <span class="quiz-prog-pct">{completionPercentage}%</span>
+                        <span class="quiz-prog-track-lbl">{answeredCount} of {totalQuestionsCount} answered</span>
+                        <lightning-icon icon-name="utility:trophy" size="xx-small" class="quiz-trophy"></lightning-icon>
+                    </div>
+                    <div class="quiz-prog-track">
+                        <div class="quiz-prog-fill" style={progressBarStyle}></div>
+                    </div>
+                </div>
+
+                <div class="quiz-page-nav">
+                    <button class="btn-page-nav" onclick={handlePrevQuestionPage} disabled={isFirstQuestionPage}>
+                        <lightning-icon icon-name="utility:chevronleft" size="xx-small"></lightning-icon>
+                    </button>
+                    <span class="quiz-page-pill">{questionPageIndicatorLabel}</span>
+                    <button class="btn-page-nav" onclick={handleNextQuestionPage} disabled={isLastQuestionPage}>
+                        <lightning-icon icon-name="utility:chevronright" size="xx-small"></lightning-icon>
+                    </button>
+                </div>
+
+                <div class="question-stack">
+                    <template for:each={paginatedQuestions} for:item="q">
+                        <div key={q.Id} class="q-card">
+                            <div class="q-card-head">
+                                <div class="q-num-badge">{q.displayIndex}</div>
+                                <span class="q-label">Question {q.displayIndex}</span>
+                                <span class={q.statusDotClass}></span>
+                                <button
+                                    class="btn-q-feedback-icon"
+                                    onclick={handleQuestionFeedbackIconClick}
+                                    data-id={q.Id}
+                                    title="Give feedback on this question">
+                                    <lightning-icon icon-name="utility:chat" size="xx-small"></lightning-icon>
+                                </button>
+                            </div>
+                            <p class="q-text">{q.Question_Text__c}</p>
+                            <lightning-textarea
+                                label="Answer"
+                                variant="label-hidden"
+                                placeholder="Write your answer here..."
+                                data-id={q.Id}
+                                value={q.savedAnswer}
+                                onchange={handleTextChange}
+                                onpaste={handlePasteBlock}
+                                oncopy={handleCopyBlock}
+                                class="q-textarea">
+                            </lightning-textarea>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="quiz-footer">
+                    <button class="btn-prev-full" onclick={handlePrevQuestionPage} disabled={isFirstQuestionPage}>
+                        ← Previous
+                    </button>
+                    <template if:false={isLastQuestionPage}>
+                        <button class="btn-next-full" onclick={handleNextQuestionPage}>
+                            Next →
+                        </button>
+                    </template>
+                    <template if:true={isLastQuestionPage}>
+                        <button class="btn-submit-full" onclick={handleSubmitVerification}>
+                            Submit assessment
+                        </button>
+                    </template>
+                </div>
+            </div>
+        </template>
+        <template if:true={showFeedbackScreen}>
+        <div class="screen">
+            <div class="hero regular-hero">
+                <div class="hero-text">
+                    <span class="eyebrow">{selectedCategoryName}</span>
+                    <h1 class="hero-title">Thanks for completing {selectedAssignmentTitle}</h1>
+                    <p class="hero-sub">Feedback is optional — let us know how it went.</p>
+                </div>
+            </div>
+
+            <div class="feedback-screen-card">
+                <p class="feedback-screen-subtitle">Overall feedback</p>
+                <template if:false={overallFeedbackSubmitted}>
+                    <textarea
+                        class="feedback-textarea"
+                        placeholder="How was this assessment overall?"
+                        value={overallFeedbackComment}
+                        oninput={handleOverallFeedbackCommentChange}>
+                    </textarea>
+                    <template if:true={overallFeedbackError}>
+                        <p class="feedback-modal-error">{overallFeedbackError}</p>
+                    </template>
+                    <button
+                        class="btn-feedback-submit"
+                        onclick={handleOverallFeedbackSubmit}
+                        disabled={isOverallFeedbackSubmitting}>
+                        Submit overall feedback
+                    </button>
+                </template>
+                <template if:true={overallFeedbackSubmitted}>
+                    <p class="feedback-thanks">✓ Thanks for your overall feedback.</p>
+                </template>
+            </div>
+
+            <button class="btn-begin-assessment" onclick={handleFeedbackScreenDone}>
+                Done →
+            </button>
+        </div>
+    </template>
+
+    <template if:true={showQuestionFeedbackModal}>
+        <div class="feedback-modal-overlay" onclick={handleQuestionFeedbackCancel}>
+            <div class="feedback-modal" onclick={stopPropagation}>
+                <p class="feedback-modal-title">Feedback on this question</p>
+                <p class="feedback-modal-subtext">{feedbackQuestionText}</p>
+                <textarea
+                    class="feedback-textarea"
+                    placeholder="What's wrong or unclear about this question?"
+                    value={feedbackQuestionComment}
+                    oninput={handleQuestionFeedbackCommentChange}>
+                </textarea>
+                <template if:true={questionFeedbackModalError}>
+                    <p class="feedback-modal-error">{questionFeedbackModalError}</p>
+                </template>
+                <div class="feedback-modal-actions">
+                    <button class="btn-feedback-cancel" onclick={handleQuestionFeedbackCancel} disabled={isQuestionFeedbackSubmitting}>Cancel</button>
+                    <button class="btn-feedback-submit" onclick={handleQuestionFeedbackSubmit} disabled={isQuestionFeedbackSubmitting}>Submit</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+        <!-- Exit Confirmation Modal -->
+        <template if:true={showExitConfirmation}>
+            <section
+                role="dialog"
+                tabindex="-1"
+                aria-modal="true"
+                aria-labelledby="exit-modal-heading"
+                class="slds-modal slds-fade-in-open">
+
+                <div class="slds-modal__container">
+
+                    <header class="slds-modal__header">
+                        <h2 id="exit-modal-heading" class="slds-text-heading_medium">
+                            Exit and submit assessment?
+                        </h2>
+                    </header>
+
+                    <div class="slds-modal__content slds-p-around_large">
+                        <p>
+                            You have not reached the final question yet.
+                        </p>
+
+                        <br>
+
+                        <p>
+                            If you exit now, your currently entered answers will be
+                            submitted as-is for AI grading — any unanswered
+                            questions will be scored as blank.
+                        </p>
+
+                        <br>
+
+                        <p class="slds-text-color_error">
+                            This action cannot be undone. You will not be able to change
+                            your answers after exiting.
+                        </p>
+                    </div>
+
+                    <footer class="slds-modal__footer">
+                        <lightning-button
+                            label="Keep Answering"
+                            onclick={handleCancelExit}>
+                        </lightning-button>
+
+                        <lightning-button
+                            variant="destructive"
+                            label="Submit & Exit"
+                            onclick={handleConfirmExit}
+                            class="slds-m-left_small">
+                        </lightning-button>
+                    </footer>
+
+                </div>
+            </section>
+
+            <div class="slds-backdrop slds-backdrop_open"></div>
+        </template>
+
+    </div>
+        <template if:true={showNavAwayConfirmation}>
+        <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open" aria-modal="true">
+            <div class="slds-modal__container">
+                <header class="slds-modal__header">
+                    <h2 class="slds-text-heading_medium">Leave this assessment?</h2>
+                </header>
+                <div class="slds-modal__content slds-p-around_medium">
+                    <p>Navigating away now will submit your current answers as-is. You won't be able to change them afterward.</p>
+                </div>
+                <footer class="slds-modal__footer">
+                    <button class="slds-button slds-button_neutral" onclick={handleCancelNavAway}>Cancel</button>
+                    <button
+                        class="slds-button slds-button_destructive"
+                        onclick={handleConfirmNavAway}
+                        disabled={isNavAwayConfirmDisabled}>
+                        {navAwayConfirmLabel}
+                    </button>
+                </footer>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+        </template>
+</template>

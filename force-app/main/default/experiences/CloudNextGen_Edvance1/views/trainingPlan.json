@@ -1,0 +1,70 @@
+{
+  "appPageId" : "6bc70838-1f40-40f7-9d18-4c380517876f",
+  "componentName" : "siteforce:dynamicLayout",
+  "dataProviders" : [ ],
+  "id" : "817613c2-542d-41eb-88a6-30a3b08c4a92",
+  "label" : "Training Plan",
+  "regions" : [ {
+    "components" : [ {
+      "componentAttributes" : {
+        "background" : "background: rgba(0,0,0,0)",
+        "backgroundOverlay" : "rgba(0,0,0,0.5)",
+        "contentAreaWidth" : 100,
+        "sectionConfig" : {
+          "UUID" : "203e7b13-ffaf-490a-8c91-6aa5e918467c",
+          "columns" : [ {
+            "UUID" : "1d768453-d465-4691-91ad-1fa033bda6f9",
+            "columnKey" : "1",
+            "columnName" : "Column 1",
+            "columnWidth" : "12",
+            "seedComponents" : [ ]
+          } ]
+        },
+        "sectionHeight" : 300
+      },
+      "componentName" : "forceCommunity:section",
+      "id" : "203e7b13-ffaf-490a-8c91-6aa5e918467c",
+      "regions" : [ {
+        "components" : [ {
+          "componentAttributes" : {
+            "richTextValue" : "<div style=\"background: #ffffff; border: 1px solid #e5e0f7; border-radius: 16px; box-shadow: 0 4px 20px rgba(91, 33, 182, 0.06); overflow: hidden; margin: 1rem 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;\">\n    \n    <!-- Card Header Bar -->\n    <div style=\"display: flex; align-items: center; justify-content: space-between; padding: 1.15rem 1.5rem; background: linear-gradient(135deg, #ede9fe 0%, #f5f3ff 100%); border-bottom: 1px solid #e5e0f7; flex-wrap: wrap; gap: 0.75rem;\">\n        <div>\n            <span style=\"font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; color: #0d9488; display: block; margin-bottom: 0.1rem;\">Training Document</span>\n            <h2 style=\"font-size: 1.25rem; font-weight: 800; color: #1e1b2e; margin: 0;\">Freshers — Training Plan</h2>\n        </div>\n        <a href=\"https://docs.google.com/spreadsheets/d/e/2PACX-1vRW2Ynu1-Y1PAfrz-H9RgNNf-Vg0ni9ns9n6eG8XY1yeX8gKMthxncDeCjSo4oSm8DoCfCQM30N64Jq/pubhtml\" \n           target=\"_blank\" \n           style=\"background: #ffffff; color: #5b21b6; border: 1px solid #d8d5ec; border-radius: 8px; padding: 0.45rem 0.95rem; font-size: 0.8rem; font-weight: 700; text-decoration: none; box-shadow: 0 1px 2px rgba(0,0,0,0.04);\">\n            Open in Google Sheets ↗\n        </a>\n    </div>\n\n    <!-- Iframe Container with Zoom to make tabs and content bigger -->\n    <div style=\"position: relative; width: 100%; height: 85vh; min-height: 620px; background: #ffffff; overflow: auto;\">\n        <iframe src=\"https://docs.google.com/spreadsheets/d/e/2PACX-1vRW2Ynu1-Y1PAfrz-H9RgNNf-Vg0ni9ns9n6eG8XY1yeX8gKMthxncDeCjSo4oSm8DoCfCQM30N64Jq/pubhtml?widget=true&amp;headers=false\" \n                style=\"width: 100%; height: 100%; zoom: 1.15; border: none; display: block;\" \n                title=\"Training Plan\">\n        </iframe>\n    </div>\n</div>"
+          },
+          "componentName" : "forceCommunity:htmlBlock",
+          "id" : "d9ae3404-8b57-4fec-a483-19e3accc5bfd",
+          "renderPriority" : "NEUTRAL",
+          "renditionMap" : { },
+          "type" : "component"
+        } ],
+        "id" : "1d768453-d465-4691-91ad-1fa033bda6f9",
+        "regionLabel" : "Column 1",
+        "regionName" : "1",
+        "renditionMap" : { },
+        "type" : "region"
+      } ],
+      "renderPriority" : "NEUTRAL",
+      "renditionMap" : { },
+      "type" : "component"
+    } ],
+    "id" : "47dd4399-e556-4ff5-9389-0cc398bb2552",
+    "regionName" : "content",
+    "type" : "region"
+  }, {
+    "components" : [ {
+      "componentAttributes" : {
+        "customHeadTags" : "",
+        "description" : "",
+        "title" : "Training Plan"
+      },
+      "componentName" : "forceCommunity:seoAssistant",
+      "id" : "c85c336a-928c-4a73-8ba9-6177960be487",
+      "renditionMap" : { },
+      "type" : "component"
+    } ],
+    "id" : "1b10e09a-e21a-4b46-9076-369da313dee6",
+    "regionName" : "sfdcHiddenRegion",
+    "type" : "region"
+  } ],
+  "themeLayoutType" : "Inner",
+  "type" : "view",
+  "viewType" : "custom-training-plan"
+}

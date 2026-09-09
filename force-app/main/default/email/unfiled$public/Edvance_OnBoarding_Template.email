@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Welcome to CloudNextGen Edvance</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f2f4f7; font-family:'Segoe UI', Helvetica, Arial, sans-serif;">
+
+<!-- Preheader (hidden preview text) -->
+<div style="display:none; max-height:0; overflow:hidden;">
+  Your CloudNextGen Edvance account is ready - verify your email to set your password.
+</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f2f4f7; padding:32px 0;">
+  <tr>
+    <td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px; width:100%; background-color:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 2px 10px rgba(16,24,40,0.06);">
+
+        <!-- Header / Logo band -->
+        <tr>
+          <td align="center" style="background:linear-gradient(135deg,#0b5fff 0%,#5b8def 50%,#7c3aed 100%); padding:36px 24px;">
+            <img src="https://cloudnextgen7-dev-ed.develop.my.site.com/Edvance/servlet/servlet.ImageServer?id=015dN000008BuH7&oid=00DdN000011A7Pl" alt="CloudNextGen" width="140" style="display:block; margin:0 auto 16px auto; max-width:140px;">
+            <p style="margin:0; color:#ffffff; font-size:14px; letter-spacing:1.5px; text-transform:uppercase; opacity:0.9;">
+              CloudNextGen Edvance
+            </p>
+          </td>
+        </tr>
+
+        <!-- Hero -->
+        <tr>
+          <td align="center" style="padding:40px 32px 8px 32px;">
+            <h1 style="margin:0 0 12px 0; font-size:24px; color:#101828; font-weight:700;">
+              Welcome, {!Receiving_User.FirstName}!
+            </h1>
+            <p style="margin:0 0 16px 0; font-size:15px; line-height:24px; color:#475467;">
+              We're excited to welcome you to the CloudNextGen family and begin this journey with you. Your <strong>CNG Edvance</strong> is your starting point for everything related to your onboarding and learning journey &mdash; your assigned resources, learning materials, assignments, attendance, and progress all live here.
+            </p>
+            <p style="margin:0 0 4px 0; font-size:15px; line-height:24px; color:#101828; font-weight:600;">
+              Your account is ready!
+            </p>
+            <p style="margin:0; font-size:15px; line-height:24px; color:#475467;">
+              To activate it and set your password, please verify your email using the link below.
+            </p>
+          </td>
+        </tr>
+
+        <!-- CTA Button -->
+        <tr>
+          <td align="center" style="padding:28px 32px;">
+            <table role="presentation" cellpadding="0" cellspacing="0">
+              <tr>
+                <td align="center" style="border-radius:8px; background:#0b5fff;">
+                  <a href="{!Community_Url}" target="_blank" style="display:inline-block; padding:14px 36px; font-size:15px; font-weight:600; color:#ffffff; text-decoration:none; border-radius:8px;">
+                    Verify Email &amp; Set Password
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Intro line, now outside the card -->
+        <tr>
+          <td style="padding:0 32px 8px 32px;">
+            <p style="margin:0; font-size:13px; color:#101828; font-weight:600; text-align:left;">
+              Once your password is set, access the portal using:
+            </p>
+          </td>
+        </tr>
+
+        <!-- Portal access card -->
+        <tr>
+          <td style="padding:0 32px 32px 32px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9fafb; border:1px solid #eaecf0; border-radius:10px;">
+              <tr>
+                <td style="padding:20px 24px;">
+                  <p style="margin:0 0 4px 0; font-size:13px; color:#475467;"><strong>Portal:</strong>
+                    <a href="{!Community_Url}" style="color:#0b5fff; text-decoration:none;">{!Community_Url}</a>
+                  </p>
+                  <p style="margin:0; font-size:13px; color:#475467;"><strong>Email:</strong> {!Receiving_User.Email}</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Body copy -->
+        <tr>
+          <td style="padding:0 32px 8px 32px;">
+            <p style="margin:0 0 16px 0; font-size:15px; line-height:24px; color:#475467;">
+              Please log in and explore your dashboard to see the activities and resources assigned to you.
+            </p>
+            <p style="margin:0 0 16px 0; font-size:15px; line-height:24px; color:#101828; font-weight:600;">
+              Your journey starts here. Learn. Practice. Grow.
+            </p>
+            <p style="margin:0; font-size:14px; line-height:22px; color:#475467;">
+              If you need any help along the way, our team is always here to support you.
+            </p>
+          </td>
+        </tr>
+
+        <!-- Sign-off -->
+        <tr>
+          <td style="padding:16px 32px 32px 32px;">
+            <p style="margin:0 0 4px 0; font-size:14px; color:#475467;">Once again, welcome to CloudNextGen!</p>
+            <p style="margin:0; font-size:14px; color:#101828;">Best regards,<br><strong>CloudNextGen Team</strong></p>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background-color:#f9fafb; padding:24px 32px; border-top:1px solid #eaecf0;" align="center">
+            <p style="margin:0 0 6px 0; font-size:12px; color:#98a2b3;">
+              Sent by {!Organization.Name} &middot; Powered by CloudNextGen IT Solutions
+            </p>
+            <p style="margin:0; font-size:12px; color:#c0c5ce;">
+              If you weren't expecting this email, you can safely ignore it.
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+
+</body>
+</html>

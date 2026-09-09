@@ -1,0 +1,68 @@
+{
+  "appPageId" : "6bc70838-1f40-40f7-9d18-4c380517876f",
+  "componentName" : "siteforce:dynamicLayout",
+  "dataProviders" : [ ],
+  "id" : "967c83d5-225b-422d-94f2-e3f72ed64709",
+  "label" : "Dashboard",
+  "regions" : [ {
+    "components" : [ {
+      "componentAttributes" : {
+        "background" : "background: rgba(0,0,0,0)",
+        "backgroundOverlay" : "rgba(0,0,0,0.5)",
+        "contentAreaWidth" : 100,
+        "sectionConfig" : {
+          "UUID" : "1b8079cb-e24f-479f-b702-6ab85e3cd0fb",
+          "columns" : [ {
+            "UUID" : "b81adc5a-8aa0-467e-a604-1992404115eb",
+            "columnKey" : "1",
+            "columnName" : "Column 1",
+            "columnWidth" : "12",
+            "seedComponents" : [ ]
+          } ]
+        },
+        "sectionHeight" : 300
+      },
+      "componentName" : "forceCommunity:section",
+      "id" : "1b8079cb-e24f-479f-b702-6ab85e3cd0fb",
+      "regions" : [ {
+        "components" : [ {
+          "componentAttributes" : { },
+          "componentName" : "c:adminAssessmentDashboard",
+          "id" : "908b6037-00e0-409b-adbc-2058d0164c8f",
+          "renderPriority" : "NEUTRAL",
+          "renditionMap" : { },
+          "type" : "component"
+        } ],
+        "id" : "b81adc5a-8aa0-467e-a604-1992404115eb",
+        "regionLabel" : "Column 1",
+        "regionName" : "1",
+        "renditionMap" : { },
+        "type" : "region"
+      } ],
+      "renderPriority" : "NEUTRAL",
+      "renditionMap" : { },
+      "type" : "component"
+    } ],
+    "id" : "6484fa19-a6a0-4bca-b535-6c40387af964",
+    "regionName" : "content",
+    "type" : "region"
+  }, {
+    "components" : [ {
+      "componentAttributes" : {
+        "customHeadTags" : "",
+        "description" : "",
+        "title" : "Dashboard"
+      },
+      "componentName" : "forceCommunity:seoAssistant",
+      "id" : "3446ba20-ddbc-4c41-9ad2-e36f4323683c",
+      "renditionMap" : { },
+      "type" : "component"
+    } ],
+    "id" : "9407c332-f5bd-4473-a88e-698e5fe81394",
+    "regionName" : "sfdcHiddenRegion",
+    "type" : "region"
+  } ],
+  "themeLayoutType" : "Inner",
+  "type" : "view",
+  "viewType" : "custom-dashboard"
+}

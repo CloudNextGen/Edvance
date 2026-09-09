@@ -1,0 +1,158 @@
+<template>
+    <div class="attendance-admin-detail">
+        <button class="back-link" onclick={handleBack}>
+            <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
+            <span>All Users</span>
+        </button>
+
+        <template if:true={showListView}>
+            <div class="screen-header">
+                <span class="eyebrow">Attendance</span>
+                <h1 class="screen-title">{employeeName}</h1>
+            </div>
+
+            <!-- KPI Metric Summary Cards -->
+            <div class="kpi-cards-grid">
+                <div class="kpi-card">
+                    <span class="kpi-title">Total Days Tracked</span>
+                    <span class="kpi-value">{historyTotalCount}</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-title">Total Late Occurrences</span>
+                    <span class="kpi-value">{totalLateCount}</span>
+                </div>
+                <div class="kpi-card">
+                    <span class="kpi-title">Total Deductions</span>
+                    <span class="kpi-value">₹{totalDeductionAmount}</span>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2 class="section-title">Pending Appeals</h2>
+                <template if:true={isLoadingAppeals}>
+                    <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+                </template>
+                <template if:true={hasNoAppeals}>
+                    <p class="empty-msg">No pending appeals for this employee.</p>
+                </template>
+                <template for:each={pendingList} for:item="item">
+                    <div key={item.id} class="appeal-card">
+                        <p class="appeal-title">{item.type} — {item.date}</p>
+                        <p class="appeal-meta">Late by {item.lateMinutes} min · Deduction {item.deduction}</p>
+                        <p class="appeal-reason">"{item.reason}"</p>
+                        <div class="appeal-actions">
+                            <lightning-button label="Approve" variant="success" data-id={item.id} data-approve="true" onclick={handleDecision}></lightning-button>
+                            <lightning-button label="Reject" variant="destructive" data-id={item.id} data-approve="false" onclick={handleDecision}></lightning-button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <div class="section">
+                <div class="section-header-row">
+                    <h2 class="section-title">History</h2>
+                    <div class="filter-bar">
+                        <label>From <input type="date" value={fromDate} onchange={handleFromChange} /></label>
+                        <label>To <input type="date" value={toDate} onchange={handleToChange} /></label>
+                        <label class="late-only-label">
+                            <input type="checkbox" checked={lateOnly} onchange={handleLateOnlyChange} />
+                            Late days only
+                        </label>
+                        <button class="apply-btn" onclick={handleApply}>Apply</button>
+                        <button class="export-btn" onclick={handleExport}>Export Data</button>
+                    </div>
+                </div>
+
+                <template if:true={isLoadingHistory}>
+                    <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+                </template>
+
+                <template if:true={hasNoHistory}>
+                    <p class="empty-msg">No records in this range.</p>
+                </template>
+
+                <table if:false={hasNoHistory} class="history-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Office In</th>
+                            <th>Office Out</th>
+                            <th>Lunch Out</th>
+                            <th>Lunch In</th>
+                            <th class="text-right">Office Late</th>
+                            <th class="text-right">Lunch Late</th>
+                            <th class="text-right">Deduction</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <template for:each={historyRows} for:item="row">
+                            <tr key={row.id} class="history-row" data-id={row.id} onclick={handleRowClick}>
+                                <td>{row.dateLabel}</td>
+                                <td>{row.officeIn}</td>
+                                <td>{row.officeOut}</td>
+                                <td>{row.lunchOut}</td>
+                                <td>{row.lunchIn}</td>
+                                <td class="text-right">{row.officeLateMinutes}</td>
+                                <td class="text-right">{row.lunchLateMinutes}</td>
+                                <td class="text-right">₹{row.deduction}</td>
+                                <td><span class={row.statusClass}>{row.statusLabel}</span></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </template>
+
+        <template if:true={noMoreHistoryPages}>
+            <div class="history-pager">
+                <button disabled={isFirstHistoryPage} onclick={handleHistoryPrevPage}>← Prev</button>
+                <span>{historyPageLabel}</span>
+                <button disabled={noMoreHistoryPages} onclick={handleHistoryNextPage}>Next →</button>
+            </div>
+        </template>
+
+        <template if:true={showDayDetailView}>
+            <button class="back-link" onclick={handleBackFromDay}>
+                <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
+                <span>All history</span>
+            </button>
+
+            <div class="screen-header">
+                <span class="eyebrow">{employeeName}</span>
+                <h1 class="screen-title">{selectedDayLabel}</h1>
+            </div>
+
+            <template if:true={isLoadingDay}>
+                <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
+            </template>
+
+            <div class="day-event-grid">
+                <template for:each={dayEvents} for:item="ev">
+                    <div key={ev.logId} class="day-event-card">
+                        <p class="event-type">{ev.type}</p>
+                        <p class="event-time">{ev.timeLabel}</p>
+                        <template if:true={ev.photoUrl}>
+                            <img src={ev.photoUrl} class="event-photo" data-url={ev.photoUrl} onclick={handlePhotoClick} alt="Attendance photo" />
+                        </template>
+                        <template if:false={ev.photoUrl}>
+                            <p class="no-photo">No photo captured</p>
+                        </template>
+                        <template if:true={ev.status}>
+                            <p class="event-status">{ev.status}</p>
+                        </template>
+                        <template if:true={ev.excusalReason}>
+                            <p class="event-reason">Reason: {ev.excusalReason}</p>
+                        </template>
+                    </div>
+                </template>
+            </div>
+        </template>
+
+        <template if:true={showLightbox}>
+            <div class="lightbox-overlay" onclick={closeLightbox}>
+                <img src={lightboxUrl} class="lightbox-img" alt="Attendance photo full size" />
+            </div>
+        </template>
+    </div>
+</template>

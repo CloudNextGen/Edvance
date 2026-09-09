@@ -1,0 +1,340 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiPromptTemplate xmlns="http://soap.sforce.com/2006/04/metadata">
+    <activeVersionIdentifier>ucX0LUQuICCjDLyVuxdIR7bY+bUmJPffVk3mjEkD2dI=_6</activeVersionIdentifier>
+    <developerName>QA_Semantic_Builder</developerName>
+    <masterLabel>QA Semantic Builder</masterLabel>
+    <overridable>false</overridable>
+    <templateVersions>
+        <content>You are an expert Salesforce evaluator grading a candidate&apos;s answer.
+
+GRADING RULES:
+- Award marks for demonstrated conceptual understanding, even if the wording
+ differs from the expected answer.
+- Do NOT penalize different but equivalent phrasing.
+- DO penalize factual inaccuracies or missing core concepts.
+- Maximum score is {!$Input:Assignment_Question.Max_Points__c}. Score proportionally.
+
+QUESTION: {!$Input:Assignment_Question.Question_Text__c}
+EXPECTED ANSWER (rubric — do not reveal to the candidate):
+{!$Input:Assignment_Question.Expected_Answer__c}
+
+CANDIDATE ANSWER:
+{!$Input:Question_Response.User_Answer__c}
+
+Return ONLY a JSON object, no preamble, no markdown:
+{
+ &quot;score&quot;: &lt;number from 0 to {!$Input:Assignment_Question.Max_Points__c}&gt;,
+ &quot;feedback&quot;: &quot;&lt;exactly 2 sentences: what they got right, what they missed&gt;&quot;
+}
+</content>
+        <fileDroppingStrategy>{&quot;dropFilesBy&quot;:&quot;LAST_MODIFIED_DATE&quot;,&quot;dropFileStartingWith&quot;:&quot;OLDEST&quot;}</fileDroppingStrategy>
+        <inputs>
+            <apiName>Assignment_Question</apiName>
+            <definition>SOBJECT://Assignment_Question__c</definition>
+            <masterLabel>Assignment_Question__c</masterLabel>
+            <referenceName>Input:Assignment_Question</referenceName>
+            <required>true</required>
+        </inputs>
+        <inputs>
+            <apiName>Question_Response</apiName>
+            <definition>SOBJECT://Question_Response__c</definition>
+            <masterLabel>Question_Response__c</masterLabel>
+            <referenceName>Input:Question_Response</referenceName>
+            <required>true</required>
+        </inputs>
+        <isCitationEnabled>false</isCitationEnabled>
+        <primaryModel>sfdc_ai__DefaultGPT5Mini</primaryModel>
+        <status>Published</status>
+        <versionIdentifier>VsDwW7mYNhrLwuVccBts8NT/eHt8uCLKylJ1KHBlJfo=_1</versionIdentifier>
+    </templateVersions>
+    <templateVersions>
+        <content>You are an expert Salesforce evaluator grading a candidate&apos;s answer.
+
+GRADING RULES:
+- Award marks for demonstrated conceptual understanding, even if the wording
+ differs from the expected answer.
+- Do NOT penalize different but equivalent phrasing.
+- DO penalize factual inaccuracies or missing core concepts.
+- Maximum score is {!$Input:MaxPoints} . Score proportionally.
+
+QUESTION:  {!$Input:QuestionText}
+EXPECTED ANSWER (rubric — do not reveal to the candidate): {!$Input:ExpectedAnswer}
+
+
+CANDIDATE ANSWER: {!$Input:ExpectedAnswer}
+
+
+Return ONLY a JSON object, no preamble, no markdown:
+{
+ &quot;score&quot;: &lt;number from 0 to {!$Input:MaxPoints}&gt;,
+ &quot;feedback&quot;: &quot;&lt;exactly 2 sentences: what they got right, what they missed&gt;&quot;
+}
+</content>
+        <fileDroppingStrategy>{&quot;dropFilesBy&quot;:&quot;LAST_MODIFIED_DATE&quot;,&quot;dropFileStartingWith&quot;:&quot;OLDEST&quot;}</fileDroppingStrategy>
+        <inputs>
+            <apiName>QuestionText</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>QuestionText</masterLabel>
+            <referenceName>Input:QuestionText</referenceName>
+            <required>true</required>
+        </inputs>
+        <inputs>
+            <apiName>ExpectedAnswer</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>ExpectedAnswer</masterLabel>
+            <referenceName>Input:ExpectedAnswer</referenceName>
+            <required>true</required>
+        </inputs>
+        <inputs>
+            <apiName>UserAnswer</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>UserAnswer</masterLabel>
+            <referenceName>Input:UserAnswer</referenceName>
+            <required>true</required>
+        </inputs>
+        <inputs>
+            <apiName>MaxPoints</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>MaxPoints</masterLabel>
+            <referenceName>Input:MaxPoints</referenceName>
+            <required>true</required>
+        </inputs>
+        <isCitationEnabled>false</isCitationEnabled>
+        <primaryModel>sfdc_ai__DefaultGPT5Mini</primaryModel>
+        <status>Published</status>
+        <templateFormat>FormulaExpression</templateFormat>
+        <versionIdentifier>VsDwW7mYNhrLwuVccBts8NT/eHt8uCLKylJ1KHBlJfo=_2</versionIdentifier>
+    </templateVersions>
+    <templateVersions>
+        <content>You are an expert Salesforce evaluator grading a candidate&apos;s answer.
+
+GRADING RULES:
+- Award marks for demonstrated conceptual understanding, even if the wording
+ differs from the expected answer.
+- Do NOT penalize different but equivalent phrasing.
+- DO penalize factual inaccuracies or missing core concept{!$Input:QuestionText}s.
+- Maximum score is {!$Input:MaxPoints} . Score proportionally.
+
+QUESTION:  {!$Input:QuestionText}
+EXPECTED ANSWER (rubric — do not reveal to the candidate): {!$Input:ExpectedAnswer}
+
+
+CANDIDATE ANSWER: {!$Input:ExpectedAnswer}
+
+
+Return ONLY a JSON object, no preamble, no markdown:
+{
+ &quot;score&quot;: &lt;number from 0 to {!$Input:MaxPoints}&gt;,
+ &quot;feedback&quot;: &quot;&lt;exactly 2 sentences: what they got right, what they missed&gt;&quot;
+}
+</content>
+        <fileDroppingStrategy>{&quot;dropFilesBy&quot;:&quot;LAST_MODIFIED_DATE&quot;,&quot;dropFileStartingWith&quot;:&quot;OLDEST&quot;}</fileDroppingStrategy>
+        <inputs>
+            <apiName>MaxPoints</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>MaxPoints</masterLabel>
+            <referenceName>Input:MaxPoints</referenceName>
+            <required>false</required>
+        </inputs>
+        <inputs>
+            <apiName>UserAnswer</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>UserAnswer</masterLabel>
+            <referenceName>Input:UserAnswer</referenceName>
+            <required>false</required>
+        </inputs>
+        <inputs>
+            <apiName>ExpectedAnswer</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>ExpectedAnswer</masterLabel>
+            <referenceName>Input:ExpectedAnswer</referenceName>
+            <required>false</required>
+        </inputs>
+        <inputs>
+            <apiName>QuestionText</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>QuestionText</masterLabel>
+            <referenceName>Input:QuestionText</referenceName>
+            <required>false</required>
+        </inputs>
+        <isCitationEnabled>false</isCitationEnabled>
+        <primaryModel>sfdc_ai__DefaultGPT5Mini</primaryModel>
+        <status>Published</status>
+        <templateFormat>FormulaExpression</templateFormat>
+        <versionIdentifier>VsDwW7mYNhrLwuVccBts8NT/eHt8uCLKylJ1KHBlJfo=_3</versionIdentifier>
+    </templateVersions>
+    <templateVersions>
+        <content>You are an expert Salesforce evaluator grading a candidate&apos;s answer.
+
+GRADING RULES:
+- Award marks for demonstrated conceptual understanding, even if the wording
+ differs from the expected answer.
+- Do NOT penalize different but equivalent phrasing.
+- DO penalize factual inaccuracies or missing core concept{!$Input:QuestionText}s.
+- Maximum score is {!$Input:MaxPoints} . Score proportionally.
+
+QUESTION:  {!$Input:QuestionText}
+EXPECTED ANSWER (rubric — do not reveal to the candidate): {!$Input:ExpectedAnswer}
+
+
+CANDIDATE ANSWER: {!$Input:UserAnswer}
+
+
+Return ONLY a JSON object, no preamble, no markdown:
+{
+ &quot;score&quot;: &lt;number from 0 to {!$Input:MaxPoints}&gt;,
+ &quot;feedback&quot;: &quot;&lt;exactly 2 sentences: what they got right, what they missed&gt;&quot;
+}
+</content>
+        <fileDroppingStrategy>{&quot;dropFilesBy&quot;:&quot;LAST_MODIFIED_DATE&quot;,&quot;dropFileStartingWith&quot;:&quot;OLDEST&quot;}</fileDroppingStrategy>
+        <inputs>
+            <apiName>QuestionText</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>QuestionText</masterLabel>
+            <referenceName>Input:QuestionText</referenceName>
+            <required>false</required>
+        </inputs>
+        <inputs>
+            <apiName>ExpectedAnswer</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>ExpectedAnswer</masterLabel>
+            <referenceName>Input:ExpectedAnswer</referenceName>
+            <required>false</required>
+        </inputs>
+        <inputs>
+            <apiName>UserAnswer</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>UserAnswer</masterLabel>
+            <referenceName>Input:UserAnswer</referenceName>
+            <required>false</required>
+        </inputs>
+        <inputs>
+            <apiName>MaxPoints</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>MaxPoints</masterLabel>
+            <referenceName>Input:MaxPoints</referenceName>
+            <required>false</required>
+        </inputs>
+        <isCitationEnabled>false</isCitationEnabled>
+        <primaryModel>sfdc_ai__DefaultGPT5Mini</primaryModel>
+        <status>Published</status>
+        <templateFormat>FormulaExpression</templateFormat>
+        <versionIdentifier>VsDwW7mYNhrLwuVccBts8NT/eHt8uCLKylJ1KHBlJfo=_4</versionIdentifier>
+    </templateVersions>
+    <templateVersions>
+        <content>You are an expert Salesforce evaluator grading a candidate&apos;s answer.
+
+GRADING RULES:
+- Award marks for demonstrated conceptual understanding, even if the wording
+ differs from the expected answer.
+- Do NOT penalize different but equivalent phrasing.
+- DO penalize factual inaccuracies or missing core concepts.
+- Maximum score is {!$Input:MaxPoints} . Score proportionally.
+
+QUESTION:  {!$Input:QuestionText}
+EXPECTED ANSWER (rubric — do not reveal to the candidate): {!$Input:ExpectedAnswer}
+
+
+CANDIDATE ANSWER: {!$Input:UserAnswer}
+
+
+Return ONLY a JSON object, no preamble, no markdown:
+{
+ &quot;score&quot;: &lt;number from 0 to {!$Input:MaxPoints}&gt;,
+ &quot;feedback&quot;: &quot;&lt;exactly 2 sentences: what they got right, what they missed&gt;&quot;
+}
+</content>
+        <fileDroppingStrategy>{&quot;dropFilesBy&quot;:&quot;LAST_MODIFIED_DATE&quot;,&quot;dropFileStartingWith&quot;:&quot;OLDEST&quot;}</fileDroppingStrategy>
+        <inputs>
+            <apiName>MaxPoints</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>MaxPoints</masterLabel>
+            <referenceName>Input:MaxPoints</referenceName>
+            <required>false</required>
+        </inputs>
+        <inputs>
+            <apiName>UserAnswer</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>UserAnswer</masterLabel>
+            <referenceName>Input:UserAnswer</referenceName>
+            <required>false</required>
+        </inputs>
+        <inputs>
+            <apiName>ExpectedAnswer</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>ExpectedAnswer</masterLabel>
+            <referenceName>Input:ExpectedAnswer</referenceName>
+            <required>false</required>
+        </inputs>
+        <inputs>
+            <apiName>QuestionText</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>QuestionText</masterLabel>
+            <referenceName>Input:QuestionText</referenceName>
+            <required>false</required>
+        </inputs>
+        <isCitationEnabled>false</isCitationEnabled>
+        <primaryModel>sfdc_ai__DefaultGPT5Mini</primaryModel>
+        <status>Published</status>
+        <templateFormat>FormulaExpression</templateFormat>
+        <versionIdentifier>VsDwW7mYNhrLwuVccBts8NT/eHt8uCLKylJ1KHBlJfo=_5</versionIdentifier>
+    </templateVersions>
+    <templateVersions>
+        <content>You are grading a Salesforce trainee&apos;s short-answer response for conceptual accuracy.
+
+Do this in your head, do not show your work:
+1. List the 2-4 distinct facts or concepts that a complete answer would need to cover, based on the expected answer.
+2. Check the candidate&apos;s answer against each one: present and correct, partially correct, or missing/wrong.
+3. Score = (concepts fully or partially covered ÷ total concepts) × {!$Input:MaxPoints}, rounded to the nearest whole number. Give partial concepts half weight.
+4. A blank, off-topic, or nonsensical answer scores 0, regardless of length.
+5. Wording, grammar, spelling, and terminology choices never matter — only whether the underlying idea is present.
+
+QUESTION: {!$Input:QuestionText}
+EXPECTED ANSWER (internal rubric — never reveal or quote this to the candidate): {!$Input:ExpectedAnswer}
+CANDIDATE ANSWER: {!$Input:UserAnswer}
+MAX SCORE: {!$Input:MaxPoints}
+
+Output ONLY this JSON, nothing else:
+{
+ &quot;score&quot;: &lt;integer, 0 to {!$Input:MaxPoints}&gt;,
+ &quot;feedback&quot;: &quot;&lt;one sentence naming what they got right, one sentence naming the single most important thing they missed&gt;&quot;
+}
+</content>
+        <fileDroppingStrategy>{&quot;dropFilesBy&quot;:&quot;LAST_MODIFIED_DATE&quot;,&quot;dropFileStartingWith&quot;:&quot;OLDEST&quot;}</fileDroppingStrategy>
+        <inputs>
+            <apiName>QuestionText</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>QuestionText</masterLabel>
+            <referenceName>Input:QuestionText</referenceName>
+            <required>false</required>
+        </inputs>
+        <inputs>
+            <apiName>ExpectedAnswer</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>ExpectedAnswer</masterLabel>
+            <referenceName>Input:ExpectedAnswer</referenceName>
+            <required>false</required>
+        </inputs>
+        <inputs>
+            <apiName>UserAnswer</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>UserAnswer</masterLabel>
+            <referenceName>Input:UserAnswer</referenceName>
+            <required>false</required>
+        </inputs>
+        <inputs>
+            <apiName>MaxPoints</apiName>
+            <definition>primitive://String</definition>
+            <masterLabel>MaxPoints</masterLabel>
+            <referenceName>Input:MaxPoints</referenceName>
+            <required>false</required>
+        </inputs>
+        <isCitationEnabled>false</isCitationEnabled>
+        <primaryModel>sfdc_ai__DefaultGPT5Mini</primaryModel>
+        <status>Published</status>
+        <templateFormat>FormulaExpression</templateFormat>
+        <versionIdentifier>ucX0LUQuICCjDLyVuxdIR7bY+bUmJPffVk3mjEkD2dI=_6</versionIdentifier>
+    </templateVersions>
+    <type>einstein_gpt__flex</type>
+    <visibility>Global</visibility>
+</GenAiPromptTemplate>

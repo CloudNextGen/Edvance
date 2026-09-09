@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomFieldTranslation xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label><!-- User Submission --></label>
+    <name>User_Submission__c</name>
+    <relationshipLabel><!-- Question Response --></relationshipLabel>
+</CustomFieldTranslation>

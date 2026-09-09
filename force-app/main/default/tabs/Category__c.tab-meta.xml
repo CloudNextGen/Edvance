@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomTab xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customObject>true</customObject>
+    <description>It allows the business to segment different skill tracks cleanly and powers the top-level selection cards a user sees when they first log into the learning portal.</description>
+    <motif>Custom50: Big top</motif>
+</CustomTab>

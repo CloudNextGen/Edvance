@@ -1,0 +1,57 @@
+:host {
+    display: block;
+}
+
+.instruction-card {
+    --slds-c-card-color-background: #ffffff;
+    --slds-c-card-radius-border: 6px;
+    border: 1px solid #d8dde6;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.instruction-container {
+    background-color: #fafbfc;
+    min-height: 100px;
+}
+
+.instruction-row {
+    display: flex;
+    align-items: center;
+    background-color: #ffffff;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    transition: all 0.2s ease-in-out;
+}
+
+.instruction-row:hover {
+    border-color: #0176d3;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.badge-container {
+    flex-shrink: 0;
+}
+
+.order-badge {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    width: 26px;
+    height: 26px;
+    background-color: #7f63f4; /* Setup purple tone */
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 50%;
+}
+
+.content-container {
+    flex-grow: 1;
+}
+
+.instruction-text {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: #181818;
+    line-height: 1.4;
+}

@@ -1,0 +1,12 @@
+{
+  "activeViewId" : "f9d1c6a9-973e-4a8b-b53b-c565311786ae",
+  "appPageId" : "6bc70838-1f40-40f7-9d18-4c380517876f",
+  "configurationTags" : [ ],
+  "devName" : "learningdocuments__c",
+  "id" : "c2a4d210-8a02-4a17-965c-724b42fc2425",
+  "label" : "Learning Documents",
+  "pageAccess" : "UseParent",
+  "routeType" : "custom-learning-documents",
+  "type" : "route",
+  "urlPrefix" : "learning-documents"
+}

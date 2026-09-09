@@ -1,0 +1,106 @@
+<template>
+    <section class="deductions-section">
+        <!-- SECTION HEADER -->
+        <div class="section-header">
+    <div class="header-left">
+        <div class="header-badge">
+            <svg class="badge-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path d="M12 2L1 21h22L12 2zm1 16h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+            </svg>
+            <span class="badge-text">Deductions Warning</span>
+        </div>
+        <div class="title-group">
+            <h2 class="section-title">Outstanding Deductions</h2>
+            <span class="count-pill">Top 3 Unsettled</span>
+        </div>
+    </div>
+    
+    <button 
+        class="refresh-btn" 
+        onclick={handleRefresh}
+        disabled={isLoading}
+        title="Refresh list">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36M20.49 15a9 9 0 0 1-14.85 3.36"/>
+        </svg>
+    </button>
+</div>
+
+        <!-- LOADING STATE -->
+        <template if:true={isLoading}>
+            <div class="loading-state" aria-live="polite">
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card"></div>
+            </div>
+        </template>
+
+        <!-- ERROR STATE -->
+        <template if:true={hasError}>
+            <div class="error-state">
+                <div class="error-icon">⚠️</div>
+                <p class="error-message">{errorMessage}</p>
+                <button class="retry-btn" onclick={handleRefresh}>
+                    Try Again
+                </button>
+            </div>
+        </template>
+
+        <!-- EMPTY STATE -->
+        <template if:true={isEmpty}>
+            <div class="empty-state">
+                <div class="empty-icon">✨</div>
+                <p class="empty-title">No Outstanding Deductions</p>
+                <p class="empty-desc">All employees have settled their deductions. Great work!</p>
+            </div>
+        </template>
+
+        <!-- DEDUCTIONS LIST -->
+        <template if:true={hasResults}>
+            <div class="deductions-container">
+                <template for:each={topEmployees} for:item="employee">
+                    <article key={employee.employeeId} class="deduction-card">
+                        <!-- RANK BADGE -->
+                        <div class="rank-badge" data-rank={employee.rank}>
+                            #{employee.rank}
+                        </div>
+
+                        <!-- CARD HEADER -->
+                        <div class="card-content">
+                            <!-- EMPLOYEE INFO -->
+                            <div class="employee-info">
+                                <div class="employee-avatar">
+                                    {employee.initials}
+                                </div>
+                                <div class="employee-details">
+                                    <h3 class="employee-name">{employee.employeeName}</h3>
+                                    <p class="attendance-date">{employee.dateFormatted}</p>
+                                </div>
+                            </div>
+
+                            <!-- DEDUCTION AMOUNT -->
+                            <div class="deduction-amount">
+                                <span class="amount-label">Deduction</span>
+                                <span class="amount-value">{employee.deductionFormatted}</span>
+                            </div>
+                        </div>
+
+                        <!-- CARD DETAILS: LATE DAYS -->
+                        <div class="card-details">
+                            <div class="detail-row">
+                                <div class="detail-item">
+                                    <span class="detail-label">OFFICE LATE</span>
+                                    <span class="detail-value">{employee.officeLateDays} Days</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">LUNCH LATE</span>
+                                    <span class="detail-value">{employee.lunchLateDays} Days</span>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                </template>
+            </div>
+        </template>
+    </section>
+</template>

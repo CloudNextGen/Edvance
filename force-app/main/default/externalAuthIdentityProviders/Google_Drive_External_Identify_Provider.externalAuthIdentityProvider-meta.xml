@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ExternalAuthIdentityProvider xmlns="http://soap.sforce.com/2006/04/metadata">
+    <authenticationFlow>AuthorizationCode</authenticationFlow>
+    <authenticationProtocol>OAuth</authenticationProtocol>
+    <externalAuthIdentityProviderParameters>
+        <parameterName>AuthorizeUrl</parameterName>
+        <parameterType>AuthorizeUrl</parameterType>
+        <parameterValue>https://accounts.google.com/o/oauth2/v2/auth</parameterValue>
+    </externalAuthIdentityProviderParameters>
+    <externalAuthIdentityProviderParameters>
+        <parameterName>ClientAuthentication</parameterName>
+        <parameterType>ClientAuthentication</parameterType>
+        <parameterValue>ClientSecretBasic</parameterValue>
+    </externalAuthIdentityProviderParameters>
+    <externalAuthIdentityProviderParameters>
+        <parameterName>PkceEnabled</parameterName>
+        <parameterType>IdentityProviderOptions</parameterType>
+        <parameterValue>false</parameterValue>
+    </externalAuthIdentityProviderParameters>
+    <externalAuthIdentityProviderParameters>
+        <parameterName>TokenUrl</parameterName>
+        <parameterType>TokenUrl</parameterType>
+        <parameterValue>https://oauth2.googleapis.com/token</parameterValue>
+    </externalAuthIdentityProviderParameters>
+    <externalAuthIdentityProviderParameters>
+        <parameterName>access_type</parameterName>
+        <parameterType>AuthorizeRequestQueryParameter</parameterType>
+        <parameterValue>offline</parameterValue>
+        <sequenceNumber>1</sequenceNumber>
+    </externalAuthIdentityProviderParameters>
+    <externalAuthIdentityProviderParameters>
+        <parameterName>prompt</parameterName>
+        <parameterType>AuthorizeRequestQueryParameter</parameterType>
+        <parameterValue>consent</parameterValue>
+        <sequenceNumber>2</sequenceNumber>
+    </externalAuthIdentityProviderParameters>
+    <label>Google Drive External Identify Provider</label>
+</ExternalAuthIdentityProvider>

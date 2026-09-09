@@ -1,0 +1,298 @@
+<template>
+    <div class="admin-dashboard">
+
+        <!-- ═══════════════════ LOADING ═══════════════════ -->
+        <template if:true={isLoading}>
+            <div class="loading-panel">
+                <div class="loading-mark"></div>
+                <p>Loading…</p>
+            </div>
+        </template>
+
+        <!-- ═══════════════════ USER SCREEN ═══════════════════ -->
+        <template if:true={showUserScreen}>
+            <div class="screen">    
+                <div class="screen-header screen-header-with-action">
+                    <div class="screen-header-text">
+                        <span class="eyebrow">Admin Console</span>
+                        <h1 class="screen-title">Experience Portal Users</h1>
+                        <p class="screen-subtitle">Select an external student or contact to audit their assignments and transcripts.</p>
+                    </div>
+                    <template if:true={showCreateUserLink}>
+                        <button type="button" class="btn-create-user" onclick={handleOpenCreateUser}>
+                            + Create User
+                        </button>
+                    </template>
+                </div>
+        
+                <div class="user-search-bar">
+                    <lightning-icon icon-name="utility:search" size="x-small" class="user-search-icon"></lightning-icon>
+                    <input
+                        type="text"
+                        class="user-search-input"
+                        placeholder="Search by name or email…"
+                        value={searchTerm}
+                        oninput={handleSearchChange} />
+                    <template if:true={searchTerm}>
+                        <button class="user-search-clear" onclick={handleClearSearch}>
+                            <lightning-icon icon-name="utility:close" size="xx-small"></lightning-icon>
+                        </button>
+                    </template>
+                </div>
+        
+                <template if:true={hasNoSearchResults}>
+                    <div class="user-search-empty">
+                        <p>No users match "<strong>{searchTerm}</strong>"</p>
+                    </div>
+                </template>
+        
+                <div class="user-grid">
+                    <template for:each={filteredUsers} for:item="u">
+                        <div key={u.Id}
+                            class="user-card"
+                            data-id={u.Id}
+                            data-name={u.Name}>
+                            <div class="user-card-avatar">
+                                <lightning-icon icon-name="standard:avatar" size="small"></lightning-icon>
+                            </div>
+                            <p class="user-name">{u.Name}</p>
+                            <p class="user-meta">{u.Email}</p>
+                            <p class="user-account">🏢 {u.Account.Name}</p>
+
+                            <template if:true={showAssignmentsLink}>
+                                <div class="user-card-actions"
+                                    data-id={u.Id}
+                                    data-name={u.Name}
+                                    onclick={handleUserClick}>
+                                    <span class="user-card-go">View Assignments →</span>
+                                </div>
+                            </template>
+                            <template if:true={showAssignFilesLink}>
+                                <button type="button"
+                                    class="assign-link"
+                                    data-contact-id={u.Id}
+                                    data-name={u.Name}
+                                    onclick={handleOpenAssign}>
+                                    Assign Files →
+                                </button>
+                            </template>
+
+                            <template if:true={showAssignFilesLink}>
+                                <button type="button" class="assign-link" data-contact-id={u.Id} data-name={u.Name} onclick={handleOpenAssignAssignments}>
+                                    Assign Assignments →
+                                </button>
+                            </template>
+
+                            <template if:true={showAttendanceLink}>
+                                <button type="button"
+                                    class="attendance-link"
+                                    data-contact-id={u.Id}
+                                    data-name={u.Name}
+                                    onclick={handleOpenAttendance}>
+                                        View Attendance →
+                                </button>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Modal rendered ONCE, outside the loop -->
+                <template if:true={showAssignModal}>
+                    <c-assign-learning-files-modal
+                        contact-id={selectedContactId}
+                        user-name={selectedUserName}
+                        onclose={handleCloseAssign}>
+                    </c-assign-learning-files-modal>
+                </template>
+                <template if:true={showAssignAssignmentsModal}>
+                    <c-assign-assignments-modal
+                        contact-id={selectedContactId}
+                        user-name={selectedUserName}
+                        onclose={handleCloseAssignAssignments}>
+                    </c-assign-assignments-modal>
+                </template>
+                <template if:true={showCreateUserModal}>
+                    <div class="ccu-modal-overlay">
+                        <div class="ccu-modal-panel">
+                            <button class="ccu-modal-close" onclick={handleCloseCreateUser} title="Close">
+                                <lightning-icon icon-name="utility:close" size="x-small"></lightning-icon>
+                            </button>
+                            <c-creating-community-user onusercreated={handleCreateUserSuccess}></c-creating-community-user>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </template>
+
+        <template if:true={showAttendanceScreen}>
+            <c-attendance-admin-detail
+                contact-id={selectedContactId}
+                employee-name={selectedUserName}
+                onback={handleBackFromAttendance}>
+            </c-attendance-admin-detail>
+        </template>
+
+        <!-- ═══════════════════ CATEGORY SCREEN ═══════════════════ -->
+        <template if:true={showCategoryScreen}>
+            <div class="screen">
+                <button class="back-link" onclick={navBackToUsers}>
+                    <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
+                    <span>All Users</span>
+                </button>
+
+                <div class="screen-header">
+                    <span class="eyebrow">Student: {selectedUserName}</span>
+                    <h1 class="screen-title">Pick a topic</h1>
+                    <p class="screen-subtitle">Choose a category to inspect assignment status.</p>
+                </div>
+
+                <div class="category-grid">
+                    <template for:each={categories} for:item="cat">
+                        <div key={cat.Id}
+                             class="category-card"
+                             data-id={cat.Id}
+                             data-name={cat.Name}
+                             onclick={handleCategoryClick}>
+                            <div class="category-card-mark">
+                                <lightning-icon icon-name="standard:folder" size="small"></lightning-icon>
+                            </div>
+                            <p class="category-card-name">{cat.Name}</p>
+                            <span class="category-card-go">Open →</span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+
+        <!-- ═══════════════════ ASSIGNMENT SCREEN ═══════════════════ -->
+        <template if:true={showAssignmentScreen}>
+            <div class="screen">
+                <button class="back-link" onclick={navBackToCategories}>
+                    <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
+                    <span>All categories</span>
+                </button>
+
+                <div class="screen-header">
+                    <span class="eyebrow">{selectedCategoryName} · {selectedUserName}</span>
+                    <h1 class="screen-title">What's next</h1>
+                </div>
+
+                <div class="assignment-list">
+                    <template for:each={assignments} for:item="asm">
+                        <div key={asm.Id} class={asm.rowClass}>
+                            <div class="assignment-row-info">
+                                <p class="assignment-row-name">{asm.Name}</p>
+                                <p class="assignment-row-meta">
+                                    <lightning-icon icon-name="utility:rows" size="xx-small"></lightning-icon>
+                                    <span>{asm.Total_Question_Count__c} questions</span>
+                                </p>
+                            </div>
+
+                            <template if:true={asm.isEligibleStatus}>
+                                <button class="btn-start" disabled>Eligible</button>
+                            </template>
+                            <template if:true={asm.isCompletedStatus}>
+                                <button class="btn-start btn-completed"
+                                        data-id={asm.Id}
+                                        data-title={asm.Name}
+                                        onclick={handleViewAttempts}>
+                                    View attempts →
+                                </button>
+                            </template>
+                            <template if:true={asm.isLockedStatus}>
+                                <button class="btn-start" disabled>Locked</button>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+
+        <!-- ═══════════════════ ATTEMPTS SCREEN ═══════════════════ -->
+        <template if:true={showAttemptsScreen}>
+            <div class="screen">
+                <button class="back-link" onclick={navBackToAssignments}>
+                    <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
+                    <span>Back</span>
+                </button>
+
+                <div class="screen-header">
+                    <span class="eyebrow">{selectedCategoryName} · {selectedUserName}</span>
+                    <h1 class="screen-title">{selectedAssignmentTitle}</h1>
+                    <p class="screen-subtitle">Select an attempt to review answers and scores.</p>
+                </div>
+
+                <div class="assignment-list">
+                    <template for:each={attempts} for:item="att">
+                        <div key={att.Id}
+                             class="assignment-row attempt-row"
+                             data-id={att.Id}
+                             data-attempt={att.Attempt_Number__c}
+                             onclick={handleAttemptClick}>
+                            <div class="assignment-row-info">
+                                <p class="assignment-row-name">Attempt {att.Attempt_Number__c}</p>
+                                <p class="assignment-row-meta">
+                                    <lightning-icon icon-name="utility:date_time" size="xx-small"></lightning-icon>
+                                    <lightning-formatted-date-time
+                                        value={att.CreatedDate}
+                                        year="numeric"
+                                        month="short"
+                                        day="numeric"
+                                        hour="2-digit"
+                                        minute="2-digit">
+                                    </lightning-formatted-date-time>
+                                </p>
+                            </div>
+                            <template if:true={att.Is_Locked__c}>
+                                <span class="locked-chip"
+                                      title={att.Lock_Reason__c}>
+                                    <lightning-icon
+                                        icon-name="utility:lock"
+                                        size="xx-small">
+                                    </lightning-icon>
+                                    Locked
+                                </span>
+                            </template>
+                            <span class="attempt-score">{att.Pass_Fail_Status__c}</span>
+                            <span class="attempt-score">{att.Earned_Score__c} / {att.Max_Score__c}</span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+
+        <!-- ═══════════════════ REVIEW SCREEN ═══════════════════ -->
+        <template if:true={showReviewScreen}>
+            <div class="screen">
+                <button class="back-link" onclick={navBackToAttempts}>
+                    <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
+                    <span>All attempts</span>
+                </button>
+
+                <div class="screen-header">
+                    <span class="eyebrow">{selectedAssignmentTitle} · {selectedUserName}</span>
+                    <h1 class="screen-title">Attempt {selectedAttemptNumber} — Review</h1>
+                </div>
+
+                <div class="question-stack">
+                    <template for:each={attemptDetail} for:item="q">
+                        <div key={q.Id} class="question-card">
+                            <div class="question-card-head">
+                                <span class="question-number">Question {q.displayIndex}</span>
+                                <span class="review-score">{q.AI_Grade__c} / {q.Max_Points__c} pts</span>
+                            </div>
+                            <p class="q-text">{q.Question_Text__c}</p>
+                            <div class="review-label">answer</div>
+                            <div class="review-answer">{q.User_Answer__c}</div>
+                            <template if:true={q.AI_Feedback__c}>
+                                <div class="review-label review-label-feedback">AI Feedback</div>
+                                <div class="review-feedback">{q.AI_Feedback__c}</div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+
+    </div>
+</template>

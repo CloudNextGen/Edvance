@@ -1,0 +1,12 @@
+{
+  "activeViewId" : "817613c2-542d-41eb-88a6-30a3b08c4a92",
+  "appPageId" : "6bc70838-1f40-40f7-9d18-4c380517876f",
+  "configurationTags" : [ ],
+  "devName" : "Training_Plan__c",
+  "id" : "de16169c-1aa6-4fa2-980d-267ae379ddcb",
+  "label" : "Training Plan",
+  "pageAccess" : "UseParent",
+  "routeType" : "custom-training-plan",
+  "type" : "route",
+  "urlPrefix" : "training-plan"
+}

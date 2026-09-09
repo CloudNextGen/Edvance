@@ -1,0 +1,669 @@
+/* ════════════════════════════════════════════════════════════════
+   ROOT & TOKENS — mirrors assignmentEngine exactly
+   ════════════════════════════════════════════════════════════════ */
+.admin-dashboard {
+    --ink:        #1A1D3B;
+    --ink-soft:   #5C6285;
+    --paper:      #F8F9FD;
+    --white:      #FFFFFF;
+    --line:       #E2E6EE;
+
+    --violet:     #7C6FD4;
+    --violet-bg:  #F1EFFF;
+    --coral:      #F07B5C;
+    --coral-bg:   #FFF3F0;
+    --teal:       #3DAB8E;
+    --teal-bg:    #EAF9F5;
+    --amber:      #E8A83E;
+    --amber-bg:   #FFF8EC;
+    --rose:       #D96B8B;
+    --rose-bg:    #FFF0F4;
+    --sky:        #4A90D9;
+    --sky-bg:     #EEF6FF;
+
+    --sage:       #2D9D78;
+    --sage-bg:    #EAF9F5;
+    --locked:     #A0A5C2;
+    --locked-bg:  #F0F2F7;
+
+    --brand-navy: #1A1D3B;
+    --brand-blue: #3B82F6;
+    --brand-teal: #14B8A6;
+
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background: var(--paper);
+    min-height: 100vh;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.screen {
+    max-width: 100%;
+    margin: 0;
+    padding: 2.5rem 3rem 4rem;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   TOPBAR & BACK BUTTON
+   ════════════════════════════════════════════════════════════════ */
+.topbar {
+    margin-bottom: 2rem;
+}
+
+.btn-back, .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0.5rem 1.1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin-bottom: 2rem;
+}
+
+.btn-back:hover, .back-link:hover {
+    border-color: var(--ink);
+    color: var(--ink);
+    box-shadow: 0 2px 8px rgba(26,29,59,0.05);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SCREEN HEADER (eyebrow + title + subtitle)
+   ════════════════════════════════════════════════════════════════ */
+.screen-header {
+    margin-bottom: 2.5rem;
+}
+
+.eyebrow {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    background: linear-gradient(90deg, #1F7FC1, #2CBFC2);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    margin-bottom: 0.5rem;
+}
+
+.screen-title {
+    font-size: 2.5rem;
+    font-weight: 850;
+    line-height: 1.15;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.02em;
+
+    background: linear-gradient(
+        100deg,
+        var(--brand-navy) 0%,
+        var(--brand-blue) 45%,
+        var(--brand-teal) 100%
+    );
+
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+}
+
+.screen-subtitle {
+    font-size: 1rem;
+    color: #4A6FA0;
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   USER GRID
+   ════════════════════════════════════════════════════════════════ */
+.user-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+
+.user-card {
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    border-top: 4px solid var(--violet);
+    padding: 1.75rem;
+    transition: transform 0.2s cubic-bezier(0.16,1,0.3,1), box-shadow 0.2s ease;
+    box-shadow: 0 4px 12px rgba(26,29,59,0.03);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.user-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 30px rgba(26,29,59,0.08);
+}
+
+.user-card-avatar {
+    width: 48px;
+    height: 48px;
+    background: var(--violet-bg);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+    --sds-c-icon-color-foreground-default: var(--violet);
+}
+
+.user-name {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: var(--ink);
+    margin: 0;
+    letter-spacing: -0.01em;
+}
+
+.user-meta {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    margin: 0;
+}
+
+.user-account {
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    margin: 0;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   CATEGORY GRID (admin version)
+   ════════════════════════════════════════════════════════════════ */
+.category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.category-card {
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    border-top: 4px solid var(--violet);
+    padding: 1.75rem;
+    cursor: pointer;
+    transition: transform 0.2s cubic-bezier(0.16,1,0.3,1), box-shadow 0.2s ease;
+    box-shadow: 0 4px 12px rgba(26,29,59,0.03);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-height: 180px;
+}
+
+.category-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 30px rgba(26,29,59,0.08);
+}
+
+.category-card-mark {
+    width: 48px;
+    height: 48px;
+    background: var(--violet-bg);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    --sds-c-icon-color-foreground-default: var(--violet);
+}
+
+.category-card-name {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--ink);
+    margin: 0;
+    letter-spacing: -0.01em;
+    flex: 1;
+}
+
+.category-card-go {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--violet);
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--line);
+    margin-top: auto;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ASSIGNMENT LIST ROWS
+   ════════════════════════════════════════════════════════════════ */
+.assignment-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.assignment-row {
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    box-shadow: 0 2px 8px rgba(26,29,59,0.02);
+    transition: box-shadow 0.15s ease;
+}
+
+.assignment-row:hover {
+    box-shadow: 0 6px 20px rgba(26,29,59,0.06);
+}
+
+.assignment-row.is-completed {
+    background: var(--sage-bg);
+    border-color: #C4ECE1;
+}
+
+.assignment-row.is-locked {
+    opacity: 0.55;
+}
+
+.assignment-row-info { flex: 1; min-width: 0; }
+
+.assignment-row-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 0.3rem;
+}
+
+.assignment-row-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    color: var(--ink-soft);
+    margin: 0;
+    --sds-c-icon-color-foreground-default: var(--ink-soft);
+}
+
+/* action buttons on rows */
+.btn-start {
+    border: none;
+    border-radius: 10px;
+    padding: 0.6rem 1.25rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: opacity 0.15s, transform 0.1s;
+    background: var(--locked-bg);
+    color: var(--locked);
+}
+
+.btn-completed {
+    background: var(--white) !important;
+    border: 1px solid var(--line) !important;
+    color: var(--ink) !important;
+    cursor: pointer !important;
+}
+
+.btn-completed:hover {
+    border-color: var(--violet) !important;
+    color: var(--violet) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ATTEMPTS LIST
+   ════════════════════════════════════════════════════════════════ */
+.attempt-row {
+    cursor: pointer;
+}
+
+.attempt-row:hover {
+    border-color: var(--violet);
+}
+
+.attempt-score {
+    font-size: 0.95rem;
+    font-weight: 700;
+    background: var(--paper);
+    padding: 0.4rem 0.85rem;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    white-space: nowrap;
+    color: var(--ink);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   REVIEW — QUESTION CARDS
+   ════════════════════════════════════════════════════════════════ */
+.question-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.question-card {
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 2rem;
+    box-shadow: 0 4px 16px rgba(26,29,59,0.02);
+}
+
+.question-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.question-number {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-soft);
+}
+
+.review-score {
+    font-size: 0.85rem;
+    font-weight: 700;
+    background: var(--sage-bg);
+    color: var(--sage);
+    padding: 0.25rem 0.7rem;
+    border-radius: 8px;
+}
+
+.question-text {
+    font-size: 1.1rem;
+    font-weight: 700;
+    line-height: 1.5;
+    color: var(--ink);
+    margin: 0 0 1rem;
+}
+
+.review-answer {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 1.25rem;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--ink);
+    white-space: pre-wrap;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   LOADING
+   ════════════════════════════════════════════════════════════════ */
+.loading-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 5rem 2rem;
+    gap: 1.25rem;
+}
+
+.loading-mark {
+    width: 40px;
+    height: 40px;
+    border: 3.5px solid var(--line);
+    border-top-color: var(--violet);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ════════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ════════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+    .screen { padding: 1.75rem 1.25rem 2.5rem; }
+    .screen-title { font-size: 1.75rem; }
+    .assignment-row { flex-direction: column; align-items: flex-start; }
+    .btn-start, .btn-completed { width: 100%; text-align: center; }
+    .user-grid, .category-grid { grid-template-columns: 1fr; }
+}
+
+.locked-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+
+    background: #fff4e5;
+    color: #8a5200;
+
+    padding: 4px 10px;
+    border-radius: 999px;
+
+    font-size: 12px;
+    font-weight: 700;
+
+    margin-right: 8px;
+}
+
+.q-text {
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.5;
+    margin: 0 0 1.5rem 0;
+}
+
+.review-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-soft);
+    margin-bottom: 0.5rem;
+}
+
+.review-label-feedback { color: var(--teal); margin-top: 1.5rem; }
+.review-feedback {
+    background: var(--teal-bg);
+    border: 1px solid #C4ECE1;
+    border-radius: 12px;
+    padding: 1.25rem;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: #1E6B54;
+}
+
+.user-search-bar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    max-width: 420px;
+    margin-bottom: 2rem;
+}
+
+.user-search-icon {
+    position: absolute;
+    left: 1rem;
+    --sds-c-icon-color-foreground-default: var(--ink-soft);
+    pointer-events: none;
+}
+
+.user-search-input {
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.7rem 2.5rem 0.7rem 2.75rem;
+    font-size: 0.9rem;
+    color: var(--ink);
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.user-search-input::placeholder {
+    color: var(--ink-soft);
+}
+
+.user-search-input:focus {
+    border-color: var(--violet);
+    box-shadow: 0 0 0 3px var(--violet-bg);
+}
+
+.user-search-clear {
+    position: absolute;
+    right: 0.6rem;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: none;
+    background: var(--paper);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    --sds-c-icon-color-foreground-default: var(--ink-soft);
+}
+
+.user-search-clear:hover {
+    background: var(--line);
+}
+
+.user-search-empty {
+    background: var(--white);
+    border: 1px dashed var(--line);
+    border-radius: 14px;
+    padding: 2rem;
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+    margin-bottom: 2rem;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   USER CARD VERTICAL BUBBLE/PILL ACTIONS (Updated)
+   ════════════════════════════════════════════════════════════════ */
+.user-card-actions {
+    display: flex;
+    flex-direction: column; /* Vertical alignment (ek ke neeche ek) */
+    gap: 8px;               /* Bubbles ke beech mein spacing */
+    margin-top: auto;       /* Card ke bottom par push karne ke liye */
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+}
+
+/* Stacked Bubble Style for all three actions */
+.user-card-go,
+.assign-link,
+.attendance-link {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    background-color: var(--violet-bg); /* Soft light purple background */
+    color: var(--violet);              /* Dark purple text */
+    padding: 8px 12px;                 /* Bubble ke andar ki padding */
+    border-radius: 10px;               /* Rounded bubble/pill shape */
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+    appearance: none;
+    transition: all 0.2s ease-in-out;
+    margin: 0;
+}
+
+/* Hover Effect for Bubbles */
+.user-card-go:hover,
+.assign-link:hover,
+.attendance-link:hover {
+    background-color: var(--violet);   /* Solid purple background on hover */
+    color: var(--white);               /* White text on hover */
+    box-shadow: 0 3px 8px rgba(124, 111, 212, 0.25);
+    text-decoration: none;
+}
+
+.screen-header-with-action {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+}
+.screen-header-with-action .screen-header-text {
+    flex: 1;
+    min-width: 0;
+}
+.btn-create-user {
+    flex-shrink: 0;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: var(--violet);
+    color: var(--white);
+    border: none;
+    border-radius: 10px;
+    padding: 0.7rem 1.35rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(124, 111, 212, 0.25);
+    transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.btn-create-user:hover {
+    background: #6a5cc4;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(124, 111, 212, 0.35);
+}
+
+.btn-create-user:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(124, 111, 212, 0.25);
+}
+
+.ccu-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(26, 29, 59, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9000;
+    padding: 1.5rem;
+}
+.ccu-modal-panel {
+    position: relative;
+    background: var(--white);
+    border-radius: 16px;
+    padding: 2rem;
+    width: 100%;
+    max-width: 480px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(26,29,59,0.25);
+}
+.ccu-modal-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: var(--paper);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10; /* Ensures the button sits above the card header */
+}
+.ccu-modal-close:hover { background: var(--line); }

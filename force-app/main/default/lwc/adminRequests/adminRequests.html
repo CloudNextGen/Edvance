@@ -1,0 +1,153 @@
+<template>
+    <div class="requests-widget">
+        <template if:true={isLoading}>
+            <div class="loading-wrap">
+                <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+            </div>
+        </template>
+
+        <template if:false={isLoading}>
+            <div class="header-row">
+                <div>
+                    <p class="eyebrow">Administration</p>
+                    <h2 class="heading">All Requests</h2>
+                    <p class="subtitle">Showing requests from queues you belong to</p>
+                </div>
+                <div class="header-actions">
+                    <button class="secondary-btn refresh-btn" onclick={handleRefresh} disabled={isRefreshing}>
+                        <template if:false={isRefreshing}>↻ Refresh</template>
+                        <template if:true={isRefreshing}>Refreshing...</template>
+                    </button>
+                    <div class="stats-wrap">
+                        <button 
+                            class={allFilterClass} 
+                            onclick={handleFilterChange} 
+                            data-filter="ALL">
+                            All ({totalCount})
+                        </button>
+                        <button 
+                            class={openFilterClass} 
+                            onclick={handleFilterChange} 
+                            data-filter="New">
+                            {openCount} Open
+                        </button>
+                        <button 
+                            class={progressFilterClass} 
+                            onclick={handleFilterChange} 
+                            data-filter="Working">
+                            {progressCount} In Progress
+                        </button>
+                        <button 
+                            class={completedFilterClass} 
+                            onclick={handleFilterChange} 
+                            data-filter="Closed">
+                            {completedCount} Completed
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <template if:true={hasError}>
+                <div class="alert alert_error">{errorMessage}</div>
+            </template>
+
+            <template if:true={hasRequests}>
+                <div class="record-list">
+                    <template for:each={displayRequests} for:item="req">
+                        <div key={req.id} class={req.rowClass} onclick={handleRowClick} data-id={req.id}>
+                            <div class="request-row__main">
+                                <div class="request-row__left">
+                                    <p class="request-subject">{req.subject}</p>
+                                    <p class="request-meta">
+                                        <span class="requester-name">{req.requesterName}</span>
+                                        <span class="request-date">• {req.date}</span>
+                                    </p>
+                                </div>
+                                <div class="request-row__right">
+                                    <span class={req.badgeClass}>{req.statusLabel}</span>
+                                    <svg class="chevron-icon" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true">
+                                        <path d="M5 7l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </template>
+
+            <template if:true={noRequests}>
+                <p class="empty-text">No requests found for this filter.</p>
+            </template>
+        </template>
+
+        <!-- Edit Modal -->
+        <template if:true={isModalOpen}>
+            <div class="modal-backdrop" onclick={handleCloseModal}>
+                <div class="modal-card" onclick={handleModalContentClick} role="dialog" aria-modal="true" aria-labelledby="edit-request-title">
+                    <div class="modal-header">
+                        <h3 class="modal-title" id="edit-request-title">Edit Request</h3>
+                        <button class="modal-close-btn" onclick={handleCloseModal} aria-label="Close" disabled={isSubmitting}>&times;</button>
+                    </div>
+
+                    <div class="modal-body">
+                        <template if:true={hasFormError}>
+                            <div class="alert alert_error">{formError}</div>
+                        </template>
+
+                        <div class="field-group">
+                            <label class="field-label">Requester</label>
+                            <p class="field-value">{selectedRequester}</p>
+                        </div>
+
+                        <div class="field-group">
+                            <label class="field-label">Subject</label>
+                            <p class="field-value">{selectedSubject}</p>
+                        </div>
+
+                        <div class="field-group">
+                            <label class="field-label">Description</label>
+                            <p class="field-value description-text">{cleanDescription}</p>
+                        </div>
+
+                        <template if:true={selectedRecordUrl}>
+                            <div class="field-group">
+                                <label class="field-label">Reference Link</label>
+                                <p class="field-value">
+                                    <a href={selectedRecordUrl} target="_blank" rel="noopener noreferrer" class="record-link">
+                                        View Related Record ↗
+                                    </a>
+                                </p>
+                            </div>
+                        </template>
+
+                        <div class="field-group">
+                            <label class="field-label">Status</label>
+                            <lightning-combobox
+                                label="Status"
+                                placeholder="Select status"
+                                value={selectedStatus}
+                                options={statusOptions}
+                                onchange={handleStatusChange}
+                                disabled={isSubmitting}
+                                hide-label="true"
+                            ></lightning-combobox>
+                        </div>
+
+                        <c-case-comment-thread
+                            record-id={selectedCaseId}
+                            show-submit-button="false"
+                        ></c-case-comment-thread>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button class="secondary-btn" onclick={handleCloseModal} disabled={isSubmitting}>Close</button>
+                        <button class="primary-btn" onclick={handleSave} disabled={isSubmitDisabled}>
+                            <template if:false={isSubmitting}>Save</template>
+                            <template if:true={isSubmitting}>Saving...</template>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+</template>

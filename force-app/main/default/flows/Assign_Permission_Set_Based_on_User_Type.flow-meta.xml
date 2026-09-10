@@ -34,7 +34,7 @@
                 </rightValue>
             </conditions>
             <connector>
-                <targetReference>Get_Team_Member_Permission_Set</targetReference>
+                <targetReference>Get_Prompt_Template_Permission_Set</targetReference>
             </connector>
             <label>Is Team Member</label>
         </rules>
@@ -143,6 +143,29 @@
         <object>PermissionSetAssignment</object>
         <storeOutputAutomatically>true</storeOutputAutomatically>
     </recordCreates>
+    <recordCreates>
+        <name>Assign_Prompt_Template_Permission_Set_To_Team_Member</name>
+        <label>Assign Prompt Template Permission Set To Team Member</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>Get_Team_Member_Permission_Set</targetReference>
+        </connector>
+        <inputAssignments>
+            <field>AssigneeId</field>
+            <value>
+                <elementReference>$Record.Id</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>PermissionSetId</field>
+            <value>
+                <elementReference>Get_Prompt_Template_Permission_Set.Id</elementReference>
+            </value>
+        </inputAssignments>
+        <object>PermissionSetAssignment</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordCreates>
     <recordLookups>
         <name>Get_HR_Permission_Set</name>
         <label>Get HR Permission Set</label>
@@ -158,6 +181,27 @@
             <operator>EqualTo</operator>
             <value>
                 <stringValue>Portal HR permission set</stringValue>
+            </value>
+        </filters>
+        <getFirstRecordOnly>true</getFirstRecordOnly>
+        <object>PermissionSet</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordLookups>
+    <recordLookups>
+        <name>Get_Prompt_Template_Permission_Set</name>
+        <label>Get Prompt Template Permission Set</label>
+        <locationX>0</locationX>
+        <locationY>0</locationY>
+        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
+        <connector>
+            <targetReference>Assign_Prompt_Template_Permission_Set_To_Team_Member</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Label</field>
+            <operator>EqualTo</operator>
+            <value>
+                <stringValue>Prompt Template User</stringValue>
             </value>
         </filters>
         <getFirstRecordOnly>true</getFirstRecordOnly>

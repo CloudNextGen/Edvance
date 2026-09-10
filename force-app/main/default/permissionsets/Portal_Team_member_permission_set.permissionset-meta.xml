@@ -40,6 +40,10 @@
         <apexClass>PortalRequestService</apexClass>
         <enabled>true</enabled>
     </classAccesses>
+    <classAccesses>
+        <apexClass>InstructionController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
     <customMetadataTypeAccesses>
         <enabled>true</enabled>
         <name>Assessment_Portal_Config__mdt</name>

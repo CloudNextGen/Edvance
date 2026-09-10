@@ -6,7 +6,16 @@ import addCaseComment from '@salesforce/apex/PortalRequestService.addCaseComment
 
 export default class CaseCommentThread extends LightningElement {
     @api recordId;
-    @api showSubmitButton = false;
+
+    _showSubmitButton = false;
+
+    @api
+    get showSubmitButton() {
+        return this._showSubmitButton;
+    }
+    set showSubmitButton(value) {
+        this._showSubmitButton = value === true || value === 'true';
+    }
 
     wiredResult;
     newComment = '';

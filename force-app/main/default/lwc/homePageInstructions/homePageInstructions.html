@@ -1,6 +1,14 @@
 <template>
-    <lightning-card title="Guidelines & Instructions" icon-name="custom:custom19" class="instruction-card">
-        
+    <div class="instruction-card">
+
+        <!-- Custom header matching page purple theme -->
+        <div class="card-header slds-p-horizontal_medium slds-p-vertical_small">
+            <div class="header-inner">
+                <lightning-icon icon-name="custom:custom19" size="x-small" class="header-icon"></lightning-icon>
+                <span class="header-title">Guidelines &amp; Instructions</span>
+            </div>
+        </div>
+
         <!-- Loading Spinner -->
         <template if:true={isLoading}>
             <div class="slds-p-around_large slds-align_absolute-center">
@@ -20,7 +28,7 @@
 
         <!-- Instructions Content -->
         <template if:false={isLoading}>
-            <div class="slds-p-around_medium instruction-container">
+            <div class="instruction-container">
                 <template if:true={hasInstructions}>
                     <div class="instruction-list">
                         <template for:each={instructions} for:item="item">
@@ -39,14 +47,15 @@
                     </div>
                 </template>
 
-                <!-- Empty State (When no instructions apply to current user) -->
+                <!-- Empty State -->
                 <template if:false={hasInstructions}>
                     <div class="slds-text-align_center slds-p-around_large">
                         <lightning-icon icon-name="utility:info_alt" size="medium" variant="neutral"></lightning-icon>
-                        <p class="slds-m-top_small slds-text-color_weak">No guidelines are available for your role at this time.</p>
+                        <p class="slds-m-top_small empty-text">No guidelines are available for your role at this time.</p>
                     </div>
                 </template>
             </div>
         </template>
-    </lightning-card>
+
+    </div>
 </template>

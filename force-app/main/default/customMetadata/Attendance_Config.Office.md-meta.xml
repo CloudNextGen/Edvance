@@ -16,7 +16,7 @@
     </values>
     <values>
         <field>Lunch_Duration_Minutes__c</field>
-        <value xsi:type="xsd:double">45.0</value>
+        <value xsi:type="xsd:double">50.0</value>
     </values>
     <values>
         <field>Need_Lunch_Photo__c</field>

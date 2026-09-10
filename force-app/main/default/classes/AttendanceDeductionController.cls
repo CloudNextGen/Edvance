@@ -26,6 +26,7 @@ public with sharing class AttendanceDeductionController {
                     SUM(Lunch_Late_Minutes__c) totalLunchLate
                 FROM Attendance_Summary__c
                 WHERE Total_Deduction_Amount__c > 0
+                AND Date__c = THIS_MONTH
                 WITH SYSTEM_MODE
                 GROUP BY Employee__c
                 ORDER BY SUM(Total_Deduction_Amount__c) DESC
@@ -53,7 +54,8 @@ public with sharing class AttendanceDeductionController {
                 for (AggregateResult arLate : [
                     SELECT Employee__c empId, COUNT(Id) totalDays 
                     FROM Attendance_Summary__c 
-                    WHERE Employee__c IN :empIds AND Office_Late_Minutes__c > 0 
+                    WHERE Employee__c IN :empIds AND Office_Late_Minutes__c > 0
+                    AND Date__c = THIS_MONTH 
                     WITH SYSTEM_MODE 
                     GROUP BY Employee__c
                 ]) {
@@ -76,6 +78,7 @@ public with sharing class AttendanceDeductionController {
                     SELECT Id, Employee__c, Date__c
                     FROM Attendance_Summary__c
                     WHERE Employee__c IN :empIds
+                    AND Date__c = THIS_MONTH
                     WITH SYSTEM_MODE
                     ORDER BY Date__c DESC
                 ]) {

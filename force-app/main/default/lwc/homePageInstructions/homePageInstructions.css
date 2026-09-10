@@ -1,33 +1,43 @@
 :host {
     display: block;
+    margin: 0.75rem 2.0rem;
 }
 
+/* Card — matches the page's lavender/soft-purple card style */
 .instruction-card {
-    --slds-c-card-color-background: #ffffff;
-    --slds-c-card-radius-border: 6px;
-    border: 1px solid #d8dde6;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    --slds-c-card-color-background: #f0eeff;
+    --slds-c-card-radius-border: 14px;
+    border: none;
+    border-radius: 14px;
+    box-shadow: 0 2px 12px rgba(131, 100, 255, 0.08);
+    background-color: #f0eeff;
+    overflow: hidden;
 }
 
+/* Inner container — transparent so card bg shows through */
 .instruction-container {
-    background-color: #fafbfc;
-    min-height: 100px;
+    background-color: transparent;
+    min-height: 60px;
+    padding: 0 0.75rem 0.75rem;
 }
 
+/* Each row — subtle white glass card, no hard borders */
 .instruction-row {
     display: flex;
     align-items: center;
-    background-color: #ffffff;
-    border: 1px solid #e1e4e8;
-    border-radius: 6px;
-    transition: all 0.2s ease-in-out;
+    background-color: rgba(255, 255, 255, 0.65);
+    border: none;
+    border-radius: 10px;
+    transition: background-color 0.18s ease, box-shadow 0.18s ease;
+    backdrop-filter: blur(4px);
 }
 
 .instruction-row:hover {
-    border-color: #0176d3;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    background-color: rgba(255, 255, 255, 0.88);
+    box-shadow: 0 3px 10px rgba(127, 99, 244, 0.12);
 }
 
+/* Badge */
 .badge-container {
     flex-shrink: 0;
 }
@@ -38,13 +48,15 @@
     align-items: center;
     width: 26px;
     height: 26px;
-    background-color: #7f63f4; /* Setup purple tone */
+    background-color: #7f63f4;
     color: #ffffff;
     font-size: 12px;
     font-weight: 700;
     border-radius: 50%;
+    box-shadow: 0 2px 6px rgba(127, 99, 244, 0.35);
 }
 
+/* Text */
 .content-container {
     flex-grow: 1;
 }
@@ -52,6 +64,32 @@
 .instruction-text {
     font-size: 13.5px;
     font-weight: 500;
-    color: #181818;
+    color: #2d1f6e;
     line-height: 1.4;
+}
+
+/* ── Custom card header ────────────────────────────────────── */
+.card-header {
+    background-color: #f0eeff;
+    border-bottom: 1px solid rgba(127, 99, 244, 0.15);
+    border-radius: 14px 14px 0 0;
+}
+
+.header-inner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.header-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #2d1f6e;
+    letter-spacing: 0.01em;
+}
+
+/* Empty-state text colour */
+.empty-text {
+    color: #7f63f4;
+    font-size: 13px;
 }

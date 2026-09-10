@@ -9,6 +9,10 @@
  *   This is the ONLY thing that makes a late record visible to a manager —
  *   see AttendanceApprovalController.
  *
+ * Saturdays are excluded from lateness: the punch time is still captured and
+ * written normally, it just never gets counted as late (no Late_Minutes__c,
+ * no deduction) — see calculateLateMinutes / isSaturday.
+ *
  * Assumes Attendance_Config__mdt (Custom Metadata Type) has fields:
  *   Office_Name__c (Text), Latitude__c (Number), Longitude__c (Number),
  *   Allowed_Radius_Meters__c (Number), Office_Start_Time__c (Text, "HH:MM[:SS]"),
@@ -313,9 +317,24 @@ public with sharing class AttendanceController {
         update s;
     }
 
+    // Saturdays never count as late — the calling code in submitPunch still writes the
+    // Event_Timestamp__c / summary time normally, this only zeroes out the lateness math
+    // so Status__c falls through to 'On Time' and no Deduction_Amount__c is applied.
+    private static Boolean isSaturday(Date d) {
+        if (d == null) {
+            return false;
+        }
+        Datetime midnight = Datetime.newInstance(d.year(), d.month(), d.day());
+        return midnight.format('EEEE') == 'Saturday';
+    }
+
     private static Integer calculateLateMinutes(String punchType, Attendance_Config__mdt office,
                                                  Attendance_Summary__c summary, Datetime eventTime) {
         Integer diffMinutes = 0;
+
+        if (isSaturday(Date.today())) {
+            return 0;
+        }
 
         if (punchType == 'Office Check-In' && String.isNotBlank(office.Office_Start_Time__c)) {
             try {

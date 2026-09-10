@@ -30,18 +30,7 @@ public without sharing class CreateCommunityUserFromFlow {
                      + 'cannot be created from this form.';
             }
 
-            // ✅ Step 3: Check if User already exists
-            List<User> existingUser = [
-                SELECT Id FROM User
-                WHERE Email = :email
-                AND IsActive = true
-                LIMIT 1
-            ];
-            if (!existingUser.isEmpty()) {
-                return 'Error: A Community User with this email already exists.';
-            }
-
-            // ✅ Step 4: Get Account Owner
+            // ✅ Step 3: Get Account Owner
             // Prevents portal users cannot own partner accounts error
             Account parentAccount = [
                 SELECT Id, OwnerId, Owner.UserType
@@ -52,7 +41,7 @@ public without sharing class CreateCommunityUserFromFlow {
 
             Id contactOwnerId = parentAccount.OwnerId;
 
-            // ✅ Step 5: If Account Owner is portal user
+            // ✅ Step 4: If Account Owner is portal user
             // Find internal user to own the Contact
             if (parentAccount.Owner.UserType != 'Standard') {
                 List<User> internalUsers = [
@@ -68,7 +57,7 @@ public without sharing class CreateCommunityUserFromFlow {
                 }
             }
 
-            // ✅ Step 6: Create Contact
+            // ✅ Step 5: Create Contact
             Contact con   = new Contact();
             con.FirstName = firstName;
             con.LastName  = lastName;
@@ -78,7 +67,7 @@ public without sharing class CreateCommunityUserFromFlow {
             con.OwnerId   = contactOwnerId;
             insert con;
 
-            // ✅ Step 7: Handle duplicate username
+            // ✅ Step 6: Handle duplicate username
             String username = email + '.portal';
             List<User> existingUsername = [
                 SELECT Id FROM User
@@ -93,7 +82,7 @@ public without sharing class CreateCommunityUserFromFlow {
                          + '.portal';
             }
 
-            // ✅ Step 8: Build alias and nickname
+            // ✅ Step 7: Build alias and nickname
             String aliasFirst = String.isBlank(firstName)
                                 ? 'u' : firstName.substring(0,1);
             String aliasLast  = lastName.substring(
@@ -109,23 +98,22 @@ public without sharing class CreateCommunityUserFromFlow {
                 nickname = nickname.substring(0, 40);
             }
 
-            // ✅ Step 9: Get Community Profile dynamically
+            // ✅ Step 8: Get Community Profile dynamically
             // Find existing community user's profile
-            List<User> communityUsers = [
-                SELECT ProfileId FROM User
-                WHERE UserType = 'PowerCustomerSuccess'
-                AND IsActive   = true
+            List<Profile> communityProfiles = [
+                SELECT Id FROM Profile
+                WHERE Name = 'Customer Community Plus Login User'
                 WITH SYSTEM_MODE
                 LIMIT 1
             ];
 
-            if (communityUsers.isEmpty()) {
+            if (communityProfiles.isEmpty()) {
                 delete con;
                 return 'Error: No Community Profile found. '
                      + 'Please contact administrator.';
             }
 
-            // ✅ Step 10: Create User with User_Type__c set
+            // ✅ Step 9: Create User with User_Type__c set
             // Flow will pick up User_Type__c and assign Permission Set
             User u              = new User();
             u.FirstName         = firstName;
@@ -133,7 +121,7 @@ public without sharing class CreateCommunityUserFromFlow {
             u.Email             = email;
             u.Username          = username;
             u.CommunityNickname = nickname;
-            u.ProfileId         = communityUsers[0].ProfileId;
+            u.ProfileId         = communityProfiles[0].Id;
             u.ContactId         = con.Id;
             u.Alias             = alias;
             u.TimeZoneSidKey    = 'Asia/Kolkata';
@@ -142,7 +130,7 @@ public without sharing class CreateCommunityUserFromFlow {
             u.LanguageLocaleKey = 'en_US';
             u.User_Type__c      = userType; // ✅ Flow uses this to assign PS
 
-            // ✅ Step 11: Insert User
+            // ✅ Step 10: Insert User
             Database.SaveResult sr = Database.insert(u, false, AccessLevel.SYSTEM_MODE);
 
             if (sr.isSuccess()) {

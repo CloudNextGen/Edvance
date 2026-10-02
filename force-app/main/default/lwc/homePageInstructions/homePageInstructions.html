@@ -1,18 +1,21 @@
 <template>
     <div class="instruction-card">
 
-        <!-- Custom header matching page purple theme -->
+        <!-- Unified Card Header -->
         <div class="card-header slds-p-horizontal_medium slds-p-vertical_small">
             <div class="header-inner">
-                <lightning-icon icon-name="custom:custom19" size="x-small" class="header-icon"></lightning-icon>
+                <lightning-icon icon-name="custom:custom19" size="small" class="header-icon"></lightning-icon>
                 <span class="header-title">Guidelines &amp; Instructions</span>
             </div>
+            <template if:true={roleName}>
+                <span class="role-pill">{roleName}</span>
+            </template>
         </div>
 
         <!-- Loading Spinner -->
         <template if:true={isLoading}>
             <div class="slds-p-around_large slds-align_absolute-center">
-                <lightning-spinner alternative-text="Loading guidelines..." size="medium"></lightning-spinner>
+                <lightning-spinner alternative-text="Loading..." size="medium"></lightning-spinner>
             </div>
         </template>
 
@@ -26,32 +29,56 @@
             </div>
         </template>
 
-        <!-- Instructions Content -->
+        <!-- Main Body -->
         <template if:false={isLoading}>
             <div class="instruction-container">
-                <template if:true={hasInstructions}>
-                    <div class="instruction-list">
-                        <template for:each={instructions} for:item="item">
-                            <div key={item.Id} class="instruction-row slds-p-around_small slds-m-bottom_x-small">
-                                <!-- Order Sequence Circle -->
-                                <div class="badge-container">
-                                    <span class="order-badge">{item.ORDER__c}</span>
-                                </div>
+                <template if:true={hasAnyInstructions}>
 
-                                <!-- Instruction Content -->
-                                <div class="content-container slds-m-left_small">
-                                    <p class="instruction-text">{item.MasterLabel}</p>
+                    <!-- Section 1: General (All) -->
+                    <template if:true={hasGeneral}>
+                        <div class="section-divider">
+                            <span class="section-title">General Guidelines</span>
+                        </div>
+                        <div class="instruction-list">
+                            <template for:each={generalList} for:item="item">
+                                <div key={item.Id} class="instruction-row">
+                                    <div class="content-container">
+                                        <lightning-formatted-rich-text 
+                                            value={item.Instructions__c} 
+                                            class="instruction-rich-text">
+                                        </lightning-formatted-rich-text>
+                                    </div>
                                 </div>
-                            </div>
-                        </template>
-                    </div>
+                            </template>
+                        </div>
+                    </template>
+
+                    <!-- Section 2: Role Specific -->
+                    <template if:true={hasRole}>
+                        <div class="section-divider slds-m-top_small">
+                            <span class="section-title">{roleName} Directives</span>
+                        </div>
+                        <div class="instruction-list">
+                            <template for:each={roleList} for:item="item">
+                                <div key={item.Id} class="instruction-row role-row">
+                                    <div class="content-container">
+                                        <lightning-formatted-rich-text 
+                                            value={item.Instructions__c} 
+                                            class="instruction-rich-text">
+                                        </lightning-formatted-rich-text>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
                 </template>
 
                 <!-- Empty State -->
-                <template if:false={hasInstructions}>
+                <template if:false={hasAnyInstructions}>
                     <div class="slds-text-align_center slds-p-around_large">
                         <lightning-icon icon-name="utility:info_alt" size="medium" variant="neutral"></lightning-icon>
-                        <p class="slds-m-top_small empty-text">No guidelines are available for your role at this time.</p>
+                        <p class="slds-m-top_small empty-text">No active instructions available at this time.</p>
                     </div>
                 </template>
             </div>

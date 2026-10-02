@@ -1,94 +1,138 @@
 :host {
     display: block;
-    margin: 0.75rem 2.0rem;
+    margin: 0.75rem 1.5rem;
 }
 
-/* Card — matches the page's lavender/soft-purple card style */
+/* Outer Card Container */
 .instruction-card {
-    --slds-c-card-color-background: #f0eeff;
-    --slds-c-card-radius-border: 14px;
-    border: none;
+    background-color: #f7f6ff;
     border-radius: 14px;
-    box-shadow: 0 2px 12px rgba(131, 100, 255, 0.08);
-    background-color: #f0eeff;
+    box-shadow: 0 3px 14px rgba(114, 86, 238, 0.08);
+    border: 1px solid rgba(127, 99, 244, 0.16);
     overflow: hidden;
 }
 
-/* Inner container — transparent so card bg shows through */
-.instruction-container {
-    background-color: transparent;
-    min-height: 60px;
-    padding: 0 0.75rem 0.75rem;
-}
-
-/* Each row — subtle white glass card, no hard borders */
-.instruction-row {
-    display: flex;
-    align-items: center;
-    background-color: rgba(255, 255, 255, 0.65);
-    border: none;
-    border-radius: 10px;
-    transition: background-color 0.18s ease, box-shadow 0.18s ease;
-    backdrop-filter: blur(4px);
-}
-
-.instruction-row:hover {
-    background-color: rgba(255, 255, 255, 0.88);
-    box-shadow: 0 3px 10px rgba(127, 99, 244, 0.12);
-}
-
-/* Badge */
-.badge-container {
-    flex-shrink: 0;
-}
-
-.order-badge {
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    width: 26px;
-    height: 26px;
-    background-color: #7f63f4;
-    color: #ffffff;
-    font-size: 12px;
-    font-weight: 700;
-    border-radius: 50%;
-    box-shadow: 0 2px 6px rgba(127, 99, 244, 0.35);
-}
-
-/* Text */
-.content-container {
-    flex-grow: 1;
-}
-
-.instruction-text {
-    font-size: 13.5px;
-    font-weight: 500;
-    color: #2d1f6e;
-    line-height: 1.4;
-}
-
-/* ── Custom card header ────────────────────────────────────── */
+/* Header */
 .card-header {
-    background-color: #f0eeff;
-    border-bottom: 1px solid rgba(127, 99, 244, 0.15);
-    border-radius: 14px 14px 0 0;
+    background: linear-gradient(135deg, #eeeafd 0%, #f7f5ff 100%);
+    border-bottom: 1px solid rgba(127, 99, 244, 0.14);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .header-inner {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.6rem;
 }
 
 .header-title {
-    font-size: 14px;
-    font-weight: 600;
-    color: #2d1f6e;
-    letter-spacing: 0.01em;
+    font-size: 14.5px;
+    font-weight: 700;
+    color: #2b1d5a;
+    letter-spacing: -0.01em;
 }
 
-/* Empty-state text colour */
+.role-pill {
+    background-color: #7f63f4;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+/* Container */
+.instruction-container {
+    padding: 0.85rem 1rem 1rem;
+}
+
+/* Section Title */
+.section-divider {
+    margin-bottom: 0.5rem;
+}
+
+.section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6d5fc2;
+}
+
+/* List & Content Cards */
+.instruction-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.instruction-row {
+    background-color: #ffffff;
+    padding: 0.85rem 1.1rem;
+    border-radius: 10px;
+    border-left: 3px solid #b8a5fc;
+    box-shadow: 0 1px 4px rgba(100, 75, 200, 0.04);
+}
+
+.role-row {
+    border-left-color: #7f63f4;
+    background-color: #fcfbfe;
+}
+
+.content-container {
+    width: 100%;
+}
+
+/* Rich Text Formatting Styles */
+.instruction-rich-text {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: #2b1d5a;
+    line-height: 1.45;
+    word-break: break-word;
+    white-space: normal; /* Fixed: Prevents enters between <li> from rendering extra blank rows */
+}
+
+.instruction-rich-text p {
+    margin: 0 0 0.25rem 0;
+}
+
+.instruction-rich-text p:last-child {
+    margin-bottom: 0;
+}
+
+.instruction-rich-text a {
+    color: #6343e8;
+    font-weight: 600;
+    text-decoration: underline;
+}
+
+/* Lists styling */
+.instruction-rich-text ul,
+.instruction-rich-text ol {
+    padding-left: 1.25rem;
+    margin: 0;
+}
+
+.instruction-rich-text ul {
+    list-style-type: disc;
+}
+
+.instruction-rich-text ol {
+    list-style-type: decimal;
+}
+
+/* Controlled list item gap */
+.instruction-rich-text li {
+    margin: 0.25rem 0;
+    padding: 0;
+    line-height: 1.4;
+}
+
 .empty-text {
     color: #7f63f4;
     font-size: 13px;

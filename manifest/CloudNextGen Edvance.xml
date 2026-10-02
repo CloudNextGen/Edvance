@@ -162,6 +162,7 @@
         <members>Instruction_Visiblity__mdt.MENTOR__c</members>
         <members>Instruction_Visiblity__mdt.ORDER__c</members>
         <members>Instruction_Visiblity__mdt.TEAM_MEMBER__c</members>
+        <members>Instruction_Visiblity__mdt.Instructions__c</members>
         <name>CustomField</name>
     </types>
     <types>

@@ -2,7 +2,9 @@ import { LightningElement, wire } from 'lwc';
 import getInstructions from '@salesforce/apex/InstructionController.getInstructions';
 
 export default class HomePageInstructions extends LightningElement {
-    instructions = [];
+    generalList = [];
+    roleList = [];
+    roleName = '';
     error;
     isLoading = true;
 
@@ -10,15 +12,49 @@ export default class HomePageInstructions extends LightningElement {
     wiredInstructions({ error, data }) {
         this.isLoading = false;
         if (data) {
-            this.instructions = data;
+            this.generalList = this.formatData(data.generalInstructions);
+            this.roleList = this.formatData(data.roleInstructions);
+            this.roleName = data.userRole || '';
             this.error = undefined;
         } else if (error) {
             this.error = error?.body?.message || 'Error loading instructions';
-            this.instructions = [];
+            this.generalList = [];
+            this.roleList = [];
         }
     }
 
-    get hasInstructions() {
-        return this.instructions && this.instructions.length > 0;
+    formatData(list) {
+        if (!list || list.length === 0) return [];
+        return list.map(item => {
+            let content = item.Instructions__c || '';
+            
+            // Check if string contains HTML tags
+            const hasHtml = /<[a-z][\s\S]*>/i.test(content);
+
+            if (hasHtml) {
+                // Remove redundant whitespace between HTML tags so li spacing doesn't blow up
+                content = content.replace(/>\s+</g, '><').trim();
+            } else {
+                // If it's plain text with Enter keys, turn newlines into proper <br/> tags
+                content = content.replace(/\r?\n/g, '<br/>');
+            }
+
+            return {
+                ...item,
+                formattedInstructions: content
+            };
+        });
+    }
+
+    get hasGeneral() {
+        return this.generalList && this.generalList.length > 0;
+    }
+
+    get hasRole() {
+        return this.roleList && this.roleList.length > 0;
+    }
+
+    get hasAnyInstructions() {
+        return this.hasGeneral || this.hasRole;
     }
 }

@@ -163,6 +163,15 @@
         <members>Instruction_Visiblity__mdt.ORDER__c</members>
         <members>Instruction_Visiblity__mdt.TEAM_MEMBER__c</members>
         <members>Instruction_Visiblity__mdt.Instructions__c</members>
+        <members>Deduction_Payment__c.Employee__c</members>
+        <members>Deduction_Payment__c.Amount__c</members>
+        <members>Deduction_Payment__c.Payment_Date__c</members>
+        <members>Deduction_Payment__c.Applied_Month__c</members>
+        <members>Deduction_Payment__c.Payment_Mode__c</members>
+        <members>Deduction_Payment__c.Remark__c</members>
+        <members>Deduction_Payment__c.Balance_Before__c</members>
+        <members>Deduction_Payment__c.Balance_After__c</members>
+        <members>Deduction_Payment__c.Recorded_By__c</members>
         <name>CustomField</name>
     </types>
     <types>
@@ -195,6 +204,7 @@
         <members>User</members>
         <members>User_Submission__c</members>
         <members>Instruction_Visiblity__mdt</members>
+        <members>Deduction_Payment__c</members>
         <name>CustomObject</name>
     </types>
     <types>
@@ -214,6 +224,7 @@
         <members>Question_Response__c-en_US</members>
         <members>Send_Email__e-en_US</members>
         <members>User_Submission__c-en_US</members>
+        <members>Deduction_Payment__c-en_US</members>
         <name>CustomObjectTranslation</name>
     </types>
     <types>

@@ -80,8 +80,11 @@
 
                             <!-- DEDUCTION AMOUNT -->
                             <div class="deduction-amount">
-                                <span class="amount-label">Deduction</span>
+                                <span class="amount-label">Pending</span>
                                 <span class="amount-value">{employee.deductionFormatted}</span>
+                                <template if:true={employee.hasPaid}>
+                                    <span class="paid-note">{employee.paidFormatted} paid of {employee.grossFormatted}</span>
+                                </template>
                             </div>
                         </div>
 
@@ -98,8 +101,79 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- ACTIONS (HR only) -->
+                        <template if:true={isHr}>
+                            <div class="card-actions">
+                                <button type="button" class="action-btn action-btn-primary" data-id={employee.employeeId} onclick={handleRedeemClick}>Redeem</button>
+                                <button type="button" class="action-btn action-btn-secondary" data-id={employee.employeeId} onclick={handleHistoryClick}>History</button>
+                            </div>
+                        </template>
                     </article>
                 </template>
+            </div>
+        </template>
+
+        <!-- MODAL -->
+        <template if:true={showModal}>
+            <div class="modal-backdrop" onclick={handleCloseModal}></div>
+            <div class="modal" role="dialog" aria-modal="true">
+                <div class="modal-header">
+                    <h3 class="modal-title">{modalTitle}</h3>
+                    <button type="button" class="modal-close" onclick={handleCloseModal} title="Close">&times;</button>
+                </div>
+
+                <div class="modal-body">
+                    <template if:true={modalError}>
+                        <div class="modal-error">{modalError}</div>
+                    </template>
+
+                    <!-- REDEEM -->
+                    <template if:true={isRedeemModal}>
+                        <div class="balance-box">
+                            <div><span class="amount-label">Outstanding</span><div class="balance-value">{balanceFormatted}</div></div>
+                            <div><span class="amount-label">Left after payment</span><div class="balance-value balance-after">{balanceAfterFormatted}</div></div>
+                        </div>
+
+                        <div class="field-row">
+                            <lightning-input type="number" label="Amount paid (₹)" step="0.01" min="0.01"
+                                value={amount} onchange={handleAmountChange}></lightning-input>
+                            <button type="button" class="link-btn" onclick={handlePayFull}>Pay full</button>
+                        </div>
+                        <lightning-input type="date" label="Payment date" value={paymentDate} max={todayStr}
+                            onchange={handleDateChange}></lightning-input>
+                        <lightning-combobox label="Payment mode" value={paymentMode} options={modeOptions}
+                            placeholder="Select (optional)" onchange={handleModeChange}></lightning-combobox>
+                        <lightning-textarea label="Remarks" value={remarks} maxlength="255"
+                            onchange={handleRemarksChange}></lightning-textarea>
+                    </template>
+
+                    <!-- HISTORY -->
+                    <template if:true={isHistoryModal}>
+                        <template if:true={isHistoryLoading}><p class="history-empty">Loading...</p></template>
+                        <template if:true={noHistory}><p class="history-empty">No payments recorded this month.</p></template>
+                        <template if:true={hasHistory}>
+                            <template for:each={history} for:item="p">
+                                <div key={p.id} class="history-row">
+                                    <div class="history-top">
+                                        <span class="history-amount">{p.amount}</span>
+                                        <span class="history-date">{p.paymentDate}</span>
+                                    </div>
+                                    <div class="history-meta">{p.balanceBefore} → {p.balanceAfter} left · {p.paymentMode}</div>
+                                    <div class="history-meta">Recorded {p.recordedAt} by {p.recordedBy}</div>
+                                    <template if:true={p.remarks}><div class="history-meta">{p.remarks}</div></template>
+                                </div>
+                            </template>
+                        </template>
+                    </template>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="action-btn action-btn-secondary" onclick={handleCloseModal} disabled={isSaving}>Close</button>
+                    <template if:true={isRedeemModal}>
+                        <button type="button" class="action-btn action-btn-primary" onclick={handleConfirm} disabled={isSaving}>{saveLabel}</button>
+                    </template>
+                </div>
             </div>
         </template>
     </section>

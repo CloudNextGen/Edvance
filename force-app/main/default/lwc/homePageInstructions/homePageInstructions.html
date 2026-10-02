@@ -12,7 +12,7 @@
             </template>
         </div>
 
-        <!-- Loading Spinner -->
+        <!-- Spinner -->
         <template if:true={isLoading}>
             <div class="slds-p-around_large slds-align_absolute-center">
                 <lightning-spinner alternative-text="Loading..." size="medium"></lightning-spinner>
@@ -44,7 +44,7 @@
                                 <div key={item.Id} class="instruction-row">
                                     <div class="content-container">
                                         <lightning-formatted-rich-text 
-                                            value={item.Instructions__c} 
+                                            value={item.formattedInstructions} 
                                             class="instruction-rich-text">
                                         </lightning-formatted-rich-text>
                                     </div>
@@ -63,7 +63,7 @@
                                 <div key={item.Id} class="instruction-row role-row">
                                     <div class="content-container">
                                         <lightning-formatted-rich-text 
-                                            value={item.Instructions__c} 
+                                            value={item.formattedInstructions} 
                                             class="instruction-rich-text">
                                         </lightning-formatted-rich-text>
                                     </div>

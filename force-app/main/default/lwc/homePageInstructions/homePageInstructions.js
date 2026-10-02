@@ -12,8 +12,8 @@ export default class HomePageInstructions extends LightningElement {
     wiredInstructions({ error, data }) {
         this.isLoading = false;
         if (data) {
-            this.generalList = data.generalInstructions || [];
-            this.roleList = data.roleInstructions || [];
+            this.generalList = this.formatData(data.generalInstructions);
+            this.roleList = this.formatData(data.roleInstructions);
             this.roleName = data.userRole || '';
             this.error = undefined;
         } else if (error) {
@@ -21,6 +21,29 @@ export default class HomePageInstructions extends LightningElement {
             this.generalList = [];
             this.roleList = [];
         }
+    }
+
+    formatData(list) {
+        if (!list || list.length === 0) return [];
+        return list.map(item => {
+            let content = item.Instructions__c || '';
+            
+            // Check if string contains HTML tags
+            const hasHtml = /<[a-z][\s\S]*>/i.test(content);
+
+            if (hasHtml) {
+                // Remove redundant whitespace between HTML tags so li spacing doesn't blow up
+                content = content.replace(/>\s+</g, '><').trim();
+            } else {
+                // If it's plain text with Enter keys, turn newlines into proper <br/> tags
+                content = content.replace(/\r?\n/g, '<br/>');
+            }
+
+            return {
+                ...item,
+                formattedInstructions: content
+            };
+        });
     }
 
     get hasGeneral() {

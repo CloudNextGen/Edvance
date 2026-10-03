@@ -7,7 +7,7 @@
     <relationshipLabel>Attendance Summaries</relationshipLabel>
     <relationshipName>Attendance_Summaries</relationshipName>
     <required>false</required>
-    <trackHistory>false</trackHistory>
+    <trackHistory>true</trackHistory>
     <trackTrending>false</trackTrending>
     <type>Lookup</type>
 </CustomField>

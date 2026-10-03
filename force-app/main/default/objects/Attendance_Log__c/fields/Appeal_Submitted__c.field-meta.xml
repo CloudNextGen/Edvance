@@ -3,7 +3,7 @@
     <fullName>Appeal_Submitted__c</fullName>
     <defaultValue>false</defaultValue>
     <label>Appeal Submitted</label>
-    <trackHistory>false</trackHistory>
+    <trackHistory>true</trackHistory>
     <trackTrending>false</trackTrending>
     <type>Checkbox</type>
 </CustomField>

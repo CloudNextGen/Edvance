@@ -3,7 +3,7 @@
     <fullName>Office_Check_In_Time__c</fullName>
     <label>Office Check In Time</label>
     <required>false</required>
-    <trackHistory>false</trackHistory>
+    <trackHistory>true</trackHistory>
     <trackTrending>false</trackTrending>
     <type>DateTime</type>
 </CustomField>

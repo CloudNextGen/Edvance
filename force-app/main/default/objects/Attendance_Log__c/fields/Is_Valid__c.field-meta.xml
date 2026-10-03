@@ -3,7 +3,7 @@
     <fullName>Is_Valid__c</fullName>
     <defaultValue>false</defaultValue>
     <label>Is Valid</label>
-    <trackHistory>false</trackHistory>
+    <trackHistory>true</trackHistory>
     <trackTrending>false</trackTrending>
     <type>Checkbox</type>
 </CustomField>

@@ -3,7 +3,7 @@
     <fullName>Office_Check_Out_Time__c</fullName>
     <label>Office Check Out Time</label>
     <required>false</required>
-    <trackHistory>false</trackHistory>
+    <trackHistory>true</trackHistory>
     <trackTrending>false</trackTrending>
     <type>DateTime</type>
 </CustomField>

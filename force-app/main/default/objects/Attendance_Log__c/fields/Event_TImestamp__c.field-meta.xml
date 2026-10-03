@@ -3,7 +3,7 @@
     <fullName>Event_TImestamp__c</fullName>
     <label>Event TImestamp</label>
     <required>false</required>
-    <trackHistory>false</trackHistory>
+    <trackHistory>true</trackHistory>
     <trackTrending>false</trackTrending>
     <type>DateTime</type>
 </CustomField>

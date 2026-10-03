@@ -1,4 +1,4 @@
-import { LightningElement, wire } from 'lwc';
+import { LightningElement, wire, api } from 'lwc';
 import { getRecord } from 'lightning/uiRecordApi';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import Id from '@salesforce/user/Id';
@@ -10,8 +10,13 @@ import getIsCommunityUser from '@salesforce/apex/PortalHomeController.isCommunit
 import raiseRequest from '@salesforce/apex/PortalRequestService.raiseRequest';
 
 const REQUEST_TYPES = ['HR Related Query', 'Manager Related Query'];
+const DEFAULT_HERO_SUBTITLE =
+    'Everything you need to check in, learn, complete assignments, and track your onboarding — all in one place.';
 
 export default class PortalHome extends LightningElement {
+    // Configurable from Experience Builder (property panel)
+    @api heroSubtitle = DEFAULT_HERO_SUBTITLE;
+
     userId = Id;
     recentFiles = [];
     isLoadingRecent = true;

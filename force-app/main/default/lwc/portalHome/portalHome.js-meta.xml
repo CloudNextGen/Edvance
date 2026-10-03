@@ -9,4 +9,23 @@
 		<target>lightningCommunity__Page_Layout</target>
 		<target>lightningCommunity__Theme_Layout</target>
 	</targets>
+	<targetConfigs>
+		<targetConfig targets="lightningCommunity__Default">
+			<property
+				name="heroSubtitle"
+				type="String"
+				label="Hero Subtitle"
+				description="Message shown below the welcome heading in the hero banner."
+				default="Everything you need to check in, learn, complete assignments, and track your onboarding — all in one place."
+			/>
+		</targetConfig>
+		<targetConfig targets="lightning__HomePage">
+			<property
+				name="heroSubtitle"
+				type="String"
+				label="Hero Subtitle"
+				default="Everything you need to check in, learn, complete assignments, and track your onboarding — all in one place."
+			/>
+		</targetConfig>
+	</targetConfigs>
 </LightningComponentBundle>

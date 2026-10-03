@@ -78,14 +78,18 @@
                             options={requestTypeOptions}
                             onchange={handleTypeChange}
                             disabled={isSubmitting}
+                            required
+                            message-when-value-missing="Please select a request type."
                         ></lightning-combobox>
 
                         <lightning-input
-                            label="Subject (optional)"
+                            label="Subject"
                             value={formSubject}
                             onchange={handleSubjectChange}
                             disabled={isSubmitting}
                             class="modal-field"
+                            required
+                            message-when-value-missing="Please enter a subject."
                         ></lightning-input>
 
                         <lightning-textarea
@@ -94,6 +98,8 @@
                             onchange={handleDescriptionChange}
                             disabled={isSubmitting}
                             class="modal-field"
+                            required
+                            message-when-value-missing="Please enter a description."
                         ></lightning-textarea>
                     </div>
 

@@ -94,6 +94,8 @@ public with sharing class PortalRequestService {
         ];
     }
 
+    // Returns requests in the queues the current user belongs to,
+    // excluding requests raised by the current user's own Contact.
     @AuraEnabled(cacheable=true)
     public static List<Case> getQueueRequests() {
         Set<Id> queueIds = getMemberQueueIds(UserInfo.getUserId());
@@ -101,11 +103,26 @@ public with sharing class PortalRequestService {
             return new List<Case>();
         }
 
+        Id myContactId = getCurrentContactId();
+
+        // User has no Contact (e.g. internal user): nothing to exclude
+        if (myContactId == null) {
+            return [
+                SELECT Id, Subject, Type, Status, CreatedDate, Description,
+                    Contact.Name, Contact.Id, Contact.Email
+                FROM Case
+                WHERE OwnerId IN :queueIds
+                WITH SYSTEM_MODE
+                ORDER BY CreatedDate DESC
+            ];
+        }
+
         return [
             SELECT Id, Subject, Type, Status, CreatedDate, Description,
                 Contact.Name, Contact.Id, Contact.Email
             FROM Case
             WHERE OwnerId IN :queueIds
+            AND (ContactId = null OR ContactId != :myContactId)
             WITH SYSTEM_MODE
             ORDER BY CreatedDate DESC
         ];
@@ -245,12 +262,18 @@ public with sharing class PortalRequestService {
         }
     }
 
+    // Queue members may work a case only if it is in their queue
+    // and was not raised by their own Contact.
     private static void assertQueueAccess(Id caseId) {
         Set<Id> queueIds = getMemberQueueIds(UserInfo.getUserId());
-        List<Case> matches = Database.query(
-            'SELECT Id FROM Case WHERE Id = :caseId AND OwnerId IN :queueIds',
-            AccessLevel.SYSTEM_MODE
-        );
+        Id myContactId = getCurrentContactId();
+
+        String query = 'SELECT Id FROM Case WHERE Id = :caseId AND OwnerId IN :queueIds';
+        if (myContactId != null) {
+            query += ' AND (ContactId = null OR ContactId != :myContactId)';
+        }
+
+        List<Case> matches = Database.query(query, AccessLevel.SYSTEM_MODE);
         if (matches.isEmpty()) {
             throw new AuraHandledException('You do not have access to update this request.');
         }

@@ -18,11 +18,18 @@
                         <h1 class="screen-title">Experience Portal Users</h1>
                         <p class="screen-subtitle">Select an external student or contact to audit their assignments and transcripts.</p>
                     </div>
-                    <template if:true={showCreateUserLink}>
-                        <button type="button" class="btn-create-user" onclick={handleOpenCreateUser}>
-                            + Create User
-                        </button>
-                    </template>
+                    <div class="dashboard-header-actions">
+                        <template if:true={showCreateUserLink}>
+                            <button type="button" class="btn-view-appeals" onclick={handleOpenAppeals}>
+                                View Appeals
+                            </button>
+                        </template>
+                        <template if:true={showCreateUserLink}>
+                            <button type="button" class="btn-create-user" onclick={handleOpenCreateUser}>
+                                + Create User
+                            </button>
+                        </template>
+                    </div>
                 </div>
         
                 <div class="user-search-bar">
@@ -130,6 +137,99 @@
                 employee-name={selectedUserName}
                 onback={handleBackFromAttendance}>
             </c-attendance-admin-detail>
+        </template>
+
+        <template if:true={showAppealsScreen}>
+            <div class="screen appeals-screen">
+                <button class="back-link" onclick={handleBackFromAppeals}>
+                    <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
+                    <span>All Users</span>
+                </button>
+                <div class="screen-header screen-header-with-action">
+                    <div class="screen-header-text">
+                        <span class="eyebrow">Admin Console</span>
+                        <h1 class="screen-title">Pending Attendance Appeals</h1>
+                        <p class="screen-subtitle">Select a team member's name to review their appeal details.</p>
+                    </div>
+                </div>
+
+                <template if:true={isAppealsLoading}>
+                    <div class="loading-panel">
+                        <lightning-spinner alternative-text="Loading pending appeals" size="medium"></lightning-spinner>
+                    </div>
+                </template>
+                <template if:false={isAppealsLoading}>
+                    <template if:true={showAppealDetail}>
+                        <section class="appeal-inline-detail" aria-labelledby="appeal-detail-title">
+                            <button type="button" class="back-link" onclick={handleCloseAppealDetail}>
+                                <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
+                                <span>Back to appeals</span>
+                            </button>
+                            <span class="eyebrow">Attendance Appeal</span>
+                            <h2 id="appeal-detail-title" class="appeal-modal-title">{selectedAppeal.EmployeeName}</h2>
+                            <dl class="appeal-detail-list">
+                                <div><dt>Attendance event</dt><dd>{selectedAppeal.Type__c}</dd></div>
+                                <div><dt>Date</dt><dd>{selectedAppeal.AppealDate}</dd></div>
+                                <div><dt>Late by</dt><dd>{selectedAppeal.Late_Minutes__c} minutes</dd></div>
+                                <div><dt>Current deduction</dt><dd>₹{selectedAppeal.Deduction_Amount__c}</dd></div>
+                                <div><dt>Appeal reason</dt><dd>{selectedAppeal.AppealReason}</dd></div>
+                            </dl>
+                        </section>
+                    </template>
+                    <template if:false={showAppealDetail}>
+                        <template if:true={hasNoPendingAppeals}>
+                            <div class="appeals-empty-state">There are no pending appeals.</div>
+                        </template>
+                        <template if:false={hasNoPendingAppeals}>
+                            <div class="appeal-review-toolbar">
+                                <p class="appeal-selection-count">{selectedAppealCount} selected</p>
+                                <div class="appeal-selection-actions">
+                                    <button type="button" class="btn-approve-all" onclick={handleApproveSelected} disabled={disableSelectedReviewActions}>
+                                        Approve
+                                    </button>
+                                    <button type="button" class="btn-reject-selected" onclick={handleRejectSelected} disabled={disableSelectedReviewActions}>
+                                        Reject
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="appeals-table-wrap">
+                                <table class="appeals-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="appeal-checkbox-column" aria-label="Select appeal"></th>
+                                            <th>Team Member</th>
+                                            <th>Attendance Event</th>
+                                            <th>Date</th>
+                                            <th>Late (minutes)</th>
+                                            <th>Current Deduction</th>
+                                            <th>Appeal Reason</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template for:each={pendingAppeals} for:item="appeal">
+                                            <tr key={appeal.Id}>
+                                                <td class="appeal-checkbox-column">
+                                                    <input type="checkbox" data-id={appeal.Id} checked={appeal.isSelected} aria-label="Select appeal" onchange={handleAppealSelection} />
+                                                </td>
+                                                <td>
+                                                    <button type="button" class="appeal-user-link" data-id={appeal.Id} onclick={handleViewAppeal}>
+                                                        {appeal.EmployeeName}
+                                                    </button>
+                                                </td>
+                                                <td>{appeal.Type__c}</td>
+                                                <td>{appeal.AppealDate}</td>
+                                                <td>{appeal.Late_Minutes__c}</td>
+                                                <td>{appeal.CurrentDeductionLabel}</td>
+                                                <td class="appeal-reason-cell" title={appeal.AppealReason}>{appeal.AppealReason}</td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </template>
+                    </template>
+                </template>
+            </div>
         </template>
 
         <!-- ═══════════════════ CATEGORY SCREEN ═══════════════════ -->

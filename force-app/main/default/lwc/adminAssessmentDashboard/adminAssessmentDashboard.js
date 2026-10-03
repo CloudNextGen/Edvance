@@ -4,6 +4,9 @@ import getCategories from '@salesforce/apex/AdminDashboardController.getCategori
 import getAdminAssignmentsForCategory from '@salesforce/apex/AdminDashboardController.getAdminAssignmentsForCategory';
 import getAdminSubmissionAttempts from '@salesforce/apex/AdminDashboardController.getAdminSubmissionAttempts';
 import getAdminSubmissionDetail from '@salesforce/apex/AdminDashboardController.getAdminSubmissionDetail';
+import getPendingAppealsForDashboard from '@salesforce/apex/AttendanceAdminController.getPendingAppealsForDashboard';
+import reviewSelectedAppeals from '@salesforce/apex/AttendanceAdminController.reviewSelectedAppeals';
+import { refreshApex } from '@salesforce/apex';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import canViewAssignments from '@salesforce/customPermission/View_Assignments';
 import canAssignFiles from '@salesforce/customPermission/Assign_Files';
@@ -15,6 +18,8 @@ export default class AdminAssessmentDashboard extends LightningElement {
     @track assignments = [];
     @track attempts = [];
     @track attemptDetail = [];
+    @track pendingAppeals = [];
+    selectedAppealIds = [];
 
     searchTerm = '';
 
@@ -24,7 +29,12 @@ export default class AdminAssessmentDashboard extends LightningElement {
     showAssignmentScreen = false;
     showAttemptsScreen = false;
     showReviewScreen = false;
+    showAppealsScreen = false;
     isLoading = false;
+    isAppealsLoading = false;
+    selectedAppeal;
+    showAppealDetail = false;
+    isReviewingAppeal = false;
 
     // Selections State
     selectedContactId;
@@ -40,8 +50,180 @@ export default class AdminAssessmentDashboard extends LightningElement {
     showAssignAssignmentsModal = false;
 
     showCreateUserModal = false;
+    appealRefreshTimer;
+    isRefreshingAppeals = false;
+    appealsRefreshQueued = false;
+    appealsRefreshRequestId = 0;
+
+    connectedCallback() {
+        this.boundHandleWindowFocus = this.handleWindowFocus.bind(this);
+        window.addEventListener('focus', this.boundHandleWindowFocus);
+    }
+
+    disconnectedCallback() {
+        this.stopAppealAutoRefresh();
+        window.removeEventListener('focus', this.boundHandleWindowFocus);
+    }
 
     get showCreateUserLink() { return canViewAttendance; }
+    get hasNoPendingAppeals() {
+        return !this.isAppealsLoading && this.pendingAppeals.length === 0;
+    }
+    get hasSelectedAppeals() {
+        return this.selectedAppealIds.length > 0;
+    }
+    get selectedAppealCount() {
+        return this.selectedAppealIds.length;
+    }
+    get disableSelectedReviewActions() {
+        return !this.hasSelectedAppeals || this.isReviewingAppeal;
+    }
+
+    handleOpenAppeals() {
+        this.showUserScreen = false;
+        this.showAppealsScreen = true;
+        this.loadPendingAppeals();
+        this.startAppealAutoRefresh();
+    }
+
+    handleBackFromAppeals() {
+        this.showAppealsScreen = false;
+        this.showUserScreen = true;
+        this.showAppealDetail = false;
+        this.selectedAppeal = undefined;
+        this.selectedAppealIds = [];
+        this.stopAppealAutoRefresh();
+    }
+
+    startAppealAutoRefresh() {
+        this.stopAppealAutoRefresh();
+        this.appealRefreshTimer = window.setInterval(() => {
+            if (this.showAppealsScreen && document.visibilityState !== 'hidden') {
+                this.loadPendingAppeals({ silent: true });
+            }
+        }, 1000);
+    }
+
+    stopAppealAutoRefresh() {
+        if (this.appealRefreshTimer) {
+            window.clearInterval(this.appealRefreshTimer);
+            this.appealRefreshTimer = undefined;
+        }
+    }
+
+    handleWindowFocus() {
+        if (this.showAppealsScreen) {
+            this.loadPendingAppeals({ silent: true });
+        }
+    }
+
+    async loadPendingAppeals(options = {}) {
+        const forceRefresh = options.force === true;
+        if (this.isRefreshingAppeals && !forceRefresh) {
+            this.appealsRefreshQueued = true;
+            return;
+        }
+        if (forceRefresh) this.appealsRefreshQueued = false;
+        const requestId = ++this.appealsRefreshRequestId;
+        this.isRefreshingAppeals = true;
+        const silent = options.silent === true;
+        if (!silent) this.isAppealsLoading = true;
+        const selectedIdsBeforeRefresh = new Set(this.selectedAppealIds);
+        try {
+            const appeals = await getPendingAppealsForDashboard();
+            if (requestId !== this.appealsRefreshRequestId) return;
+            this.pendingAppeals = appeals.map((appeal) => ({
+                ...appeal,
+                EmployeeName: appeal.Employee__r?.Name || 'Unknown user',
+                AppealDate: appeal.Attendance_Summary__r?.Date__c || null,
+                CurrentDeductionLabel: `₹${Number(appeal.Deduction_Amount__c || 0).toFixed(2)}`,
+                AppealReason: appeal.Excusal_Reason__c || 'No reason provided',
+                isSelected: selectedIdsBeforeRefresh.has(appeal.Id)
+            }));
+            this.selectedAppealIds = this.pendingAppeals
+                .filter((appeal) => appeal.isSelected)
+                .map((appeal) => appeal.Id);
+            if (this.selectedAppeal) {
+                this.selectedAppeal = this.pendingAppeals.find((appeal) => appeal.Id === this.selectedAppeal.Id);
+                if (!this.selectedAppeal) this.showAppealDetail = false;
+            }
+        } catch (error) {
+            if (requestId === this.appealsRefreshRequestId && !silent) {
+                this.showToast('Error', error?.body?.message ?? error?.message ?? 'Could not load pending appeals.', 'error');
+            }
+        } finally {
+            if (requestId === this.appealsRefreshRequestId) {
+                if (!silent) this.isAppealsLoading = false;
+                this.isRefreshingAppeals = false;
+            }
+            if (requestId === this.appealsRefreshRequestId && this.appealsRefreshQueued && this.showAppealsScreen) {
+                this.appealsRefreshQueued = false;
+                this.loadPendingAppeals({ silent: true });
+            }
+        }
+    }
+
+    handleViewAppeal(event) {
+        const appealId = event.currentTarget.dataset.id;
+        this.selectedAppeal = this.pendingAppeals.find((appeal) => appeal.Id === appealId);
+        this.showAppealDetail = true;
+        this.selectedAppealIds = [];
+        this.syncAppealSelection();
+    }
+
+    handleAppealSelection(event) {
+        const appealId = event.currentTarget.dataset.id;
+        if (event.target.checked) {
+            this.selectedAppealIds = [...new Set([...this.selectedAppealIds, appealId])];
+        } else {
+            this.selectedAppealIds = this.selectedAppealIds.filter((id) => id !== appealId);
+        }
+        this.syncAppealSelection();
+    }
+
+    syncAppealSelection() {
+        const selectedIds = new Set(this.selectedAppealIds);
+        this.pendingAppeals = this.pendingAppeals.map((appeal) => ({
+            ...appeal,
+            isSelected: selectedIds.has(appeal.Id)
+        }));
+    }
+
+    async reviewSelected(approve) {
+        if (this.isReviewingAppeal || !this.hasSelectedAppeals) return;
+        this.isReviewingAppeal = true;
+        const selectedCount = this.selectedAppealIds.length;
+        try {
+            const reviewedCount = await reviewSelectedAppeals({
+                logIds: this.selectedAppealIds,
+                approve
+            });
+            this.showToast('Success', `${reviewedCount} of ${selectedCount} selected appeal(s) ${approve ? 'approved' : 'rejected'}.`, 'success');
+            const reviewedIds = new Set(this.selectedAppealIds);
+            this.pendingAppeals = this.pendingAppeals.filter((appeal) => !reviewedIds.has(appeal.Id));
+            this.selectedAppealIds = [];
+            await this.loadPendingAppeals({ silent: true, force: true });
+        } catch (error) {
+            this.showToast('Error', error?.body?.message ?? error?.message ?? 'Could not review selected appeals.', 'error');
+        } finally {
+            this.isReviewingAppeal = false;
+        }
+    }
+
+    handleApproveSelected() {
+        this.reviewSelected(true);
+    }
+
+    handleRejectSelected() {
+        this.reviewSelected(false);
+    }
+
+    handleCloseAppealDetail() {
+        this.showAppealDetail = false;
+        this.selectedAppeal = undefined;
+        this.selectedAppealIds = [];
+        this.syncAppealSelection();
+    }
 
     handleOpenCreateUser() {
         this.showCreateUserModal = true;
@@ -51,9 +233,16 @@ export default class AdminAssessmentDashboard extends LightningElement {
         this.showCreateUserModal = false;
     }
 
-    handleCreateUserSuccess() {
+    async handleCreateUserSuccess() {
         this.showCreateUserModal = false;
         this.showToast('Success', 'User created.', 'success');
+        if (this.wiredUsersResult) {
+            try {
+                await refreshApex(this.wiredUsersResult);
+            } catch (error) {
+                this.showToast('Refresh failed', 'User was created, but the roster could not be refreshed.', 'warning');
+            }
+        }
     }
 
     get showAssignmentsLink() { return canViewAssignments; }
@@ -61,7 +250,9 @@ export default class AdminAssessmentDashboard extends LightningElement {
     get showAttendanceLink() { return canViewAttendance; }
 
     @wire(getExperienceUsers)
-    wiredUsers({ error, data }) {
+    wiredUsers(result) {
+        this.wiredUsersResult = result;
+        const { error, data } = result;
         if (data) this.users = data;
         else if (error) this.showToast('Error', 'Failed to retrieve active roster profiles.', 'error');
     }

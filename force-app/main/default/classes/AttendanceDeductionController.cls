@@ -6,8 +6,8 @@ public without sharing class AttendanceDeductionController {
     public class DeductionSummaryWrapper {
         @AuraEnabled public String employeeId { get; set; }
         @AuraEnabled public String employeeName { get; set; }
-        @AuraEnabled public Decimal totalDeductionAmount { get; set; } // gross (this month)
-        @AuraEnabled public Decimal paidAmount { get; set; }           // redeemed so far (this month)
+        @AuraEnabled public Decimal totalDeductionAmount { get; set; } // gross (all time)
+        @AuraEnabled public Decimal paidAmount { get; set; }           // redeemed so far (all time)
         @AuraEnabled public Decimal remainingAmount { get; set; }      // gross - paid
         @AuraEnabled public Decimal offLateMinutes { get; set; }
         @AuraEnabled public Decimal lunchLateMinutes { get; set; }
@@ -44,7 +44,7 @@ public without sharing class AttendanceDeductionController {
     }
 
     /* ------------------------------------------------------------------ */
-    /*  READ: top 3 employees by REMAINING deduction (this month)          */
+    /*  READ: employees by REMAINING deduction          */
     /* ------------------------------------------------------------------ */
     @AuraEnabled(cacheable=true)
     public static List<DeductionSummaryWrapper> getTopDeductionsEmployees() {
@@ -60,7 +60,6 @@ public without sharing class AttendanceDeductionController {
                        SUM(Lunch_Late_Minutes__c) totalLunchLate
                 FROM Attendance_Summary__c
                 WHERE Total_Deduction_Amount__c > 0
-                AND Date__c = THIS_MONTH
                 AND Employee__c != null
                 WITH SYSTEM_MODE
                 GROUP BY Employee__c
@@ -77,12 +76,11 @@ public without sharing class AttendanceDeductionController {
 
             if (byEmp.isEmpty()) return resultList;
 
-            // 2) Payments already made against this month
+            // 2) All payments already made against these deductions
             for (AggregateResult ar : [
                 SELECT Employee__c empId, SUM(Amount__c) paid
                 FROM Deduction_Payment__c
                 WHERE Employee__c IN :byEmp.keySet()
-                AND Applied_Month__c = THIS_MONTH
                 WITH SYSTEM_MODE
                 GROUP BY Employee__c
             ]) {
@@ -90,14 +88,14 @@ public without sharing class AttendanceDeductionController {
                 if (w != null && ar.get('paid') != null) w.paidAmount = (Decimal) ar.get('paid');
             }
 
-            // 3) Remaining = gross - paid; keep only > 0; rank desc; top 3
+            // 3) Remaining = gross - paid; keep every outstanding employee and rank desc
             List<DeductionSummaryWrapper> pending = new List<DeductionSummaryWrapper>();
             for (DeductionSummaryWrapper w : byEmp.values()) {
                 w.remainingAmount = w.totalDeductionAmount - w.paidAmount;
                 if (w.remainingAmount > 0) pending.add(w);
             }
             pending.sort(new RemainingDescComparator());
-            for (Integer i = 0; i < pending.size() && i < 3; i++) resultList.add(pending[i]);
+            resultList.addAll(pending);
 
             if (resultList.isEmpty()) return resultList;
 
@@ -110,14 +108,13 @@ public without sharing class AttendanceDeductionController {
                 employeeNameMap.put(c.Id, c.Name);
             }
 
-            // 5) Late day counts (both limited to THIS_MONTH)
+            // 5) Late day counts across all attendance history
             Map<Id, Integer> officeLateDaysMap = new Map<Id, Integer>();
             Map<Id, Integer> lunchLateDaysMap = new Map<Id, Integer>();
             for (AggregateResult a : [
                 SELECT Employee__c empId, COUNT(Id) totalDays
                 FROM Attendance_Summary__c
                 WHERE Employee__c IN :empIds AND Office_Late_Minutes__c > 0
-                AND Date__c = THIS_MONTH
                 WITH SYSTEM_MODE
                 GROUP BY Employee__c
             ]) {
@@ -127,20 +124,18 @@ public without sharing class AttendanceDeductionController {
                 SELECT Employee__c empId, COUNT(Id) totalDays
                 FROM Attendance_Summary__c
                 WHERE Employee__c IN :empIds AND Lunch_Late_Minutes__c > 0
-                AND Date__c = THIS_MONTH
                 WITH SYSTEM_MODE
                 GROUP BY Employee__c
             ]) {
                 lunchLateDaysMap.put((Id) a.get('empId'), (Integer) a.get('totalDays'));
             }
 
-            // 6) Latest summary record
+            // 6) Latest summary record across all attendance history
             Map<Id, Attendance_Summary__c> latestRecordMap = new Map<Id, Attendance_Summary__c>();
             for (Attendance_Summary__c rec : [
                 SELECT Id, Employee__c, Date__c
                 FROM Attendance_Summary__c
                 WHERE Employee__c IN :empIds
-                AND Date__c = THIS_MONTH
                 WITH SYSTEM_MODE
                 ORDER BY Date__c DESC
             ]) {
@@ -179,13 +174,12 @@ public without sharing class AttendanceDeductionController {
             Date payDate = paymentDate != null ? paymentDate : Date.today();
             if (payDate > Date.today()) throw new AuraHandledException('Payment date cannot be in the future.');
 
-            // Re-check balance on the server (never trust the amount shown in the UI)
+            // Re-check the all-time balance on the server (never trust the amount shown in the UI)
             Decimal gross = 0;
             for (AggregateResult ar : [
                 SELECT SUM(Total_Deduction_Amount__c) t
                 FROM Attendance_Summary__c
                 WHERE Employee__c = :employeeId AND Total_Deduction_Amount__c > 0
-                AND Date__c = THIS_MONTH
                 WITH SYSTEM_MODE
             ]) {
                 if (ar.get('t') != null) gross = (Decimal) ar.get('t');
@@ -194,7 +188,7 @@ public without sharing class AttendanceDeductionController {
             for (AggregateResult ar : [
                 SELECT SUM(Amount__c) p
                 FROM Deduction_Payment__c
-                WHERE Employee__c = :employeeId AND Applied_Month__c = THIS_MONTH
+                WHERE Employee__c = :employeeId
                 WITH SYSTEM_MODE
             ]) {
                 if (ar.get('p') != null) paid = (Decimal) ar.get('p');
@@ -233,7 +227,7 @@ public without sharing class AttendanceDeductionController {
     }
 
     /* ------------------------------------------------------------------ */
-    /*  READ: payment history for one employee (this month)                */
+    /*  READ: payment history for one employee (all time)                  */
     /* ------------------------------------------------------------------ */
     @AuraEnabled
     public static List<PaymentWrapper> getPaymentHistory(Id employeeId) {
@@ -244,7 +238,7 @@ public without sharing class AttendanceDeductionController {
                 SELECT Id, Amount__c, Payment_Date__c, CreatedDate, Payment_Mode__c, Remark__c,
                        Balance_Before__c, Balance_After__c, Recorded_By__r.Name
                 FROM Deduction_Payment__c
-                WHERE Employee__c = :employeeId AND Applied_Month__c = THIS_MONTH
+                WHERE Employee__c = :employeeId
                 WITH SYSTEM_MODE
                 ORDER BY CreatedDate DESC
             ]) {

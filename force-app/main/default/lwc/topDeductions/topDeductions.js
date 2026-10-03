@@ -29,8 +29,7 @@ export default class TopDeductions extends LightningElement {
     @track history = [];
     modeOptions = [];
 
-    // true only if user's permission set (Portal HR permission set) includes
-    // the custom permission "Portal HR Access"
+    // true only if user's permission set includes "Portal HR Access"
     get isHr() {
         return hasHrPermission === true;
     }
@@ -51,7 +50,13 @@ export default class TopDeductions extends LightningElement {
         if (data) {
             this.hasError = false;
             this.errorMessage = '';
-            this.topEmployees = data.map((item, index) => {
+
+            // Highest pending deduction first, so rank #1 is always "The Unofficial CEO"
+            const sorted = [...data].sort(
+                (a, b) => Number(b.remainingAmount || 0) - Number(a.remainingAmount || 0)
+            );
+
+            this.topEmployees = sorted.map((item, index) => {
                 const nameParts = item.employeeName ? item.employeeName.trim().split(' ') : ['E', 'M'];
                 const initials =
                     nameParts.length >= 2
@@ -83,11 +88,44 @@ export default class TopDeductions extends LightningElement {
     get hasResults() {
         return !this.isLoading && !this.hasError && this.topEmployees.length > 0;
     }
+
     get isEmpty() {
         return !this.isLoading && !this.hasError && this.topEmployees.length === 0;
     }
 
-    /* ---------- modal getters ---------- */
+    // Employee with the highest pending deduction = "The Unofficial CEO"
+    get ceoEmployee() {
+        return this.topEmployees.length > 0 ? this.topEmployees[0] : null;
+    }
+
+    get otherEmployees() {
+        return this.topEmployees.slice(1);
+    }
+
+    get hasOtherEmployees() {
+        return this.otherEmployees.length > 0;
+    }
+
+    // Header pill text
+    get unsettledLabel() {
+        const count = this.topEmployees.length;
+        return count > 0 ? `${count} Unsettled` : 'All Unsettled';
+    }
+
+    /* ---------- Treat Header Summary Getters ---------- */
+    get totalPoolFormatted() {
+        const total = this.topEmployees.reduce(
+            (sum, item) => sum + Number(item.remaining || 0),
+            0
+        );
+        return fmt(total);
+    }
+
+    get topContributorName() {
+        return this.ceoEmployee ? this.ceoEmployee.employeeName : 'None';
+    }
+
+    /* ---------- Modal Getters ---------- */
     get showModal() { return this.modalType !== null; }
     get isRedeemModal() { return this.modalType === 'redeem'; }
     get isHistoryModal() { return this.modalType === 'history'; }
@@ -106,7 +144,7 @@ export default class TopDeductions extends LightningElement {
     get noHistory() { return !this.isHistoryLoading && this.history.length === 0; }
     get saveLabel() { return this.isSaving ? 'Saving...' : 'Confirm payment'; }
 
-    /* ---------- actions ---------- */
+    /* ---------- Actions ---------- */
     handleRedeemClick(event) {
         this.selected = this.topEmployees.find((e) => e.employeeId === event.currentTarget.dataset.id);
         this.amount = this.selected.remaining; // full amount by default
@@ -157,12 +195,18 @@ export default class TopDeductions extends LightningElement {
 
     async handleConfirm() {
         const a = Number(this.amount);
-        if (!a || a <= 0) { this.modalError = 'Enter an amount greater than 0.'; return; }
+        if (!a || a <= 0) { 
+            this.modalError = 'Enter an amount greater than 0.'; 
+            return; 
+        }
         if (a > this.selected.remaining) {
             this.modalError = `Amount cannot exceed ${this.balanceFormatted}.`;
             return;
         }
-        if (!this.paymentDate) { this.modalError = 'Select the payment date.'; return; }
+        if (!this.paymentDate) { 
+            this.modalError = 'Select the payment date.'; 
+            return; 
+        }
 
         this.isSaving = true;
         this.modalError = '';

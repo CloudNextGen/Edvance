@@ -1,30 +1,35 @@
 <template>
     <section class="deductions-section">
-        <!-- SECTION HEADER -->
+        <!-- SECTION HEADER: TREAT LEADERBOARD -->
         <div class="section-header">
-    <div class="header-left">
-        <div class="header-badge">
-            <svg class="badge-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                <path d="M12 2L1 21h22L12 2zm1 16h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
-            </svg>
-            <span class="badge-text">Deductions Warning</span>
+            <div class="header-left">
+                <div class="header-badge header-badge-treat">
+                    <span class="badge-trophy">🏆</span>
+                    <span class="badge-text">TREAT LEADERBOARD</span>
+                </div>
+                <div class="title-group">
+                    <h2 class="section-title">Outstanding Treats</h2>
+                    <span class="count-pill">Unsettled Treat Contributions</span>
+                </div>
+            </div>
+            
+            <div class="header-right">
+                <div class="pool-summary">
+                    <div class="pool-total">Total Treats Pool: <strong>{totalPoolFormatted}</strong></div>
+                    <div class="pool-top">Top Contributor: <strong>{topContributorName}</strong></div>
+                </div>
+
+                <button 
+                    class="refresh-btn" 
+                    onclick={handleRefresh}
+                    disabled={isLoading}
+                    title="Refresh list">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36M20.49 15a9 9 0 0 1-14.85 3.36"/>
+                    </svg>
+                </button>
+            </div>
         </div>
-        <div class="title-group">
-            <h2 class="section-title">Outstanding Deductions</h2>
-            <span class="count-pill">Top 3 Unsettled</span>
-        </div>
-    </div>
-    
-    <button 
-        class="refresh-btn" 
-        onclick={handleRefresh}
-        disabled={isLoading}
-        title="Refresh list">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36M20.49 15a9 9 0 0 1-14.85 3.36"/>
-        </svg>
-    </button>
-</div>
 
         <!-- LOADING STATE -->
         <template if:true={isLoading}>
@@ -57,59 +62,152 @@
 
         <!-- DEDUCTIONS LIST -->
         <template if:true={hasResults}>
-            <div class="deductions-container">
-                <template for:each={topEmployees} for:item="employee">
-                    <article key={employee.employeeId} class="deduction-card">
-                        <!-- RANK BADGE -->
-                        <div class="rank-badge" data-rank={employee.rank}>
-                            #{employee.rank}
+            <div class="ceo-layout">
+
+                <!-- ===== #1 : THE UNOFFICIAL CEO (highest pending deduction) ===== -->
+                <article class="ceo-card">
+                    <div class="ceo-banner">
+                        <svg class="ceo-confetti" viewBox="0 0 600 120" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                            <g>
+                                <rect x="20" y="18" width="10" height="5" rx="1" fill="#E8B84A" transform="rotate(25 25 20)" />
+                                <rect x="70" y="60" width="9" height="4" rx="1" fill="#D49A1F" transform="rotate(-30 75 62)" />
+                                <rect x="110" y="25" width="8" height="4" rx="1" fill="#F2CC6B" transform="rotate(50 114 27)" />
+                                <rect x="160" y="85" width="10" height="5" rx="1" fill="#E8B84A" transform="rotate(-20 165 87)" />
+                                <rect x="210" y="15" width="9" height="4" rx="1" fill="#C98A12" transform="rotate(35 214 17)" />
+                                <rect x="270" y="95" width="8" height="4" rx="1" fill="#F2CC6B" transform="rotate(15 274 97)" />
+                                <rect x="340" y="12" width="10" height="5" rx="1" fill="#D49A1F" transform="rotate(-40 345 14)" />
+                                <rect x="395" y="70" width="9" height="4" rx="1" fill="#E8B84A" transform="rotate(30 399 72)" />
+                                <rect x="450" y="22" width="8" height="4" rx="1" fill="#F2CC6B" transform="rotate(-25 454 24)" />
+                                <rect x="500" y="88" width="10" height="5" rx="1" fill="#C98A12" transform="rotate(45 505 90)" />
+                                <rect x="545" y="30" width="9" height="4" rx="1" fill="#E8B84A" transform="rotate(-35 549 32)" />
+                                <rect x="575" y="75" width="8" height="4" rx="1" fill="#D49A1F" transform="rotate(20 579 77)" />
+                                <circle cx="48" cy="100" r="3" fill="#E8B84A" />
+                                <circle cx="130" cy="55" r="2.5" fill="#D49A1F" />
+                                <circle cx="240" cy="50" r="3" fill="#F2CC6B" />
+                                <circle cx="320" cy="100" r="2.5" fill="#E8B84A" />
+                                <circle cx="430" cy="48" r="3" fill="#D49A1F" />
+                                <circle cx="520" cy="55" r="2.5" fill="#F2CC6B" />
+                            </g>
+                        </svg>
+
+                        <div class="ceo-banner-content">
+                            <svg class="ceo-crown" viewBox="0 0 64 44" width="56" height="40" aria-hidden="true">
+                                <defs>
+                                    <linearGradient id="crownGold" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stop-color="#FFE08A" />
+                                        <stop offset="55%" stop-color="#E8B84A" />
+                                        <stop offset="100%" stop-color="#B8821A" />
+                                    </linearGradient>
+                                </defs>
+                                <path d="M4 38 L8 10 L22 24 L32 4 L42 24 L56 10 L60 38 Z" fill="url(#crownGold)" stroke="#9A6B10" stroke-width="2" stroke-linejoin="round" />
+                                <rect x="4" y="38" width="56" height="5" rx="2" fill="#C98A12" stroke="#9A6B10" stroke-width="1.5" />
+                                <circle cx="8" cy="9" r="3" fill="#F2CC6B" stroke="#9A6B10" stroke-width="1.2" />
+                                <circle cx="32" cy="4" r="3.2" fill="#F2CC6B" stroke="#9A6B10" stroke-width="1.2" />
+                                <circle cx="56" cy="9" r="3" fill="#F2CC6B" stroke="#9A6B10" stroke-width="1.2" />
+                            </svg>
+                            <h3 class="ceo-title">The Unofficial CEO</h3>
                         </div>
 
-                        <!-- CARD HEADER -->
-                        <div class="card-content">
-                            <!-- EMPLOYEE INFO -->
-                            <div class="employee-info">
-                                <div class="employee-avatar">
-                                    {employee.initials}
-                                </div>
-                                <div class="employee-details">
-                                    <h3 class="employee-name">{employee.employeeName}</h3>
-                                    <p class="attendance-date">{employee.dateFormatted}</p>
-                                </div>
-                            </div>
+                        <div class="ceo-rank">#1</div>
+                    </div>
 
-                            <!-- DEDUCTION AMOUNT -->
-                            <div class="deduction-amount">
-                                <span class="amount-label">Pending</span>
-                                <span class="amount-value">{employee.deductionFormatted}</span>
-                                <template if:true={employee.hasPaid}>
-                                    <span class="paid-note">{employee.paidFormatted} paid of {employee.grossFormatted}</span>
+                    <div class="ceo-body">
+                        <div class="ceo-avatar-wrap">
+                            <div class="ceo-avatar">{ceoEmployee.initials}</div>
+                            <span class="ceo-dot"></span>
+                        </div>
+
+                        <div class="ceo-info">
+                            <h3 class="ceo-name">{ceoEmployee.employeeName}</h3>
+                            <p class="ceo-date">{ceoEmployee.dateFormatted}</p>
+                        </div>
+
+                        <div class="ceo-amount">
+                            <span class="ceo-pending-pill">Pending</span>
+                            <span class="ceo-amount-value">{ceoEmployee.deductionFormatted}</span>
+                            <template if:true={ceoEmployee.hasPaid}>
+                                <span class="paid-note">{ceoEmployee.paidFormatted} paid of {ceoEmployee.grossFormatted}</span>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="ceo-details">
+                        <div class="detail-item">
+                            <span class="detail-label">OFFICE LATE</span>
+                            <span class="detail-value">{ceoEmployee.officeLateDays} Days</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">LUNCH LATE</span>
+                            <span class="detail-value">{ceoEmployee.lunchLateDays} Days</span>
+                        </div>
+                    </div>
+
+                    <!-- ACTIONS (HR only) -->
+                    <template if:true={isHr}>
+                        <div class="card-actions ceo-actions">
+                            <button type="button" class="action-btn action-btn-primary" data-id={ceoEmployee.employeeId} onclick={handleRedeemClick}>Redeem</button>
+                            <button type="button" class="action-btn action-btn-secondary" data-id={ceoEmployee.employeeId} onclick={handleHistoryClick}>History</button>
+                        </div>
+                    </template>
+                </article>
+
+                <!-- ===== #2, #3 ... ===== -->
+                <template if:true={hasOtherEmployees}>
+                    <div class="deductions-container ceo-others">
+                        <template for:each={otherEmployees} for:item="employee">
+                            <article key={employee.employeeId} class="deduction-card">
+                                <!-- RANK BADGE -->
+                                <div class="rank-badge" data-rank={employee.rank}>
+                                    #{employee.rank}
+                                </div>
+
+                                <!-- CARD HEADER -->
+                                <div class="card-content">
+                                    <!-- EMPLOYEE INFO -->
+                                    <div class="employee-info">
+                                        <div class="employee-avatar">
+                                            {employee.initials}
+                                        </div>
+                                        <div class="employee-details">
+                                            <h3 class="employee-name">{employee.employeeName}</h3>
+                                            <p class="attendance-date">{employee.dateFormatted}</p>
+                                        </div>
+                                    </div>
+
+                                    <!-- DEDUCTION AMOUNT -->
+                                    <div class="deduction-amount">
+                                        <span class="amount-label">Pending</span>
+                                        <span class="amount-value">{employee.deductionFormatted}</span>
+                                        <template if:true={employee.hasPaid}>
+                                            <span class="paid-note">{employee.paidFormatted} paid of {employee.grossFormatted}</span>
+                                        </template>
+                                    </div>
+                                </div>
+
+                                <!-- CARD DETAILS: LATE DAYS -->
+                                <div class="card-details">
+                                    <div class="detail-row">
+                                        <div class="detail-item">
+                                            <span class="detail-label">OFFICE LATE</span>
+                                            <span class="detail-value">{employee.officeLateDays} Days</span>
+                                        </div>
+                                        <div class="detail-item">
+                                            <span class="detail-label">LUNCH LATE</span>
+                                            <span class="detail-value">{employee.lunchLateDays} Days</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- ACTIONS (HR only) -->
+                                <template if:true={isHr}>
+                                    <div class="card-actions">
+                                        <button type="button" class="action-btn action-btn-primary" data-id={employee.employeeId} onclick={handleRedeemClick}>Redeem</button>
+                                        <button type="button" class="action-btn action-btn-secondary" data-id={employee.employeeId} onclick={handleHistoryClick}>History</button>
+                                    </div>
                                 </template>
-                            </div>
-                        </div>
-
-                        <!-- CARD DETAILS: LATE DAYS -->
-                        <div class="card-details">
-                            <div class="detail-row">
-                                <div class="detail-item">
-                                    <span class="detail-label">OFFICE LATE</span>
-                                    <span class="detail-value">{employee.officeLateDays} Days</span>
-                                </div>
-                                <div class="detail-item">
-                                    <span class="detail-label">LUNCH LATE</span>
-                                    <span class="detail-value">{employee.lunchLateDays} Days</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- ACTIONS (HR only) -->
-                        <template if:true={isHr}>
-                            <div class="card-actions">
-                                <button type="button" class="action-btn action-btn-primary" data-id={employee.employeeId} onclick={handleRedeemClick}>Redeem</button>
-                                <button type="button" class="action-btn action-btn-secondary" data-id={employee.employeeId} onclick={handleHistoryClick}>History</button>
-                            </div>
+                            </article>
                         </template>
-                    </article>
+                    </div>
                 </template>
             </div>
         </template>

@@ -151,6 +151,15 @@
                         <h1 class="screen-title">Pending Attendance Appeals</h1>
                         <p class="screen-subtitle">Select a team member's name to review their appeal details.</p>
                     </div>
+                    <div class="dashboard-header-actions">
+                        <lightning-button
+                            label="Refresh"
+                            title="Refresh pending appeals"
+                            icon-name="utility:refresh"
+                            onclick={handleRefreshAppeals}
+                            disabled={isRefreshingAppeals}>
+                        </lightning-button>
+                    </div>
                 </div>
 
                 <template if:true={isAppealsLoading}>

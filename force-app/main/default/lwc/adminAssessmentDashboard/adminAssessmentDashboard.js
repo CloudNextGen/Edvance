@@ -6,7 +6,6 @@ import getAdminSubmissionAttempts from '@salesforce/apex/AdminDashboardControlle
 import getAdminSubmissionDetail from '@salesforce/apex/AdminDashboardController.getAdminSubmissionDetail';
 import getPendingAppealsForDashboard from '@salesforce/apex/AttendanceAdminController.getPendingAppealsForDashboard';
 import reviewSelectedAppeals from '@salesforce/apex/AttendanceAdminController.reviewSelectedAppeals';
-import { refreshApex } from '@salesforce/apex';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import canViewAssignments from '@salesforce/customPermission/View_Assignments';
 import canAssignFiles from '@salesforce/customPermission/Assign_Files';
@@ -50,20 +49,9 @@ export default class AdminAssessmentDashboard extends LightningElement {
     showAssignAssignmentsModal = false;
 
     showCreateUserModal = false;
-    appealRefreshTimer;
     isRefreshingAppeals = false;
     appealsRefreshQueued = false;
     appealsRefreshRequestId = 0;
-
-    connectedCallback() {
-        this.boundHandleWindowFocus = this.handleWindowFocus.bind(this);
-        window.addEventListener('focus', this.boundHandleWindowFocus);
-    }
-
-    disconnectedCallback() {
-        this.stopAppealAutoRefresh();
-        window.removeEventListener('focus', this.boundHandleWindowFocus);
-    }
 
     get showCreateUserLink() { return canViewAttendance; }
     get hasNoPendingAppeals() {
@@ -83,7 +71,10 @@ export default class AdminAssessmentDashboard extends LightningElement {
         this.showUserScreen = false;
         this.showAppealsScreen = true;
         this.loadPendingAppeals();
-        this.startAppealAutoRefresh();
+    }
+
+    handleRefreshAppeals() {
+        this.loadPendingAppeals();
     }
 
     handleBackFromAppeals() {
@@ -92,33 +83,10 @@ export default class AdminAssessmentDashboard extends LightningElement {
         this.showAppealDetail = false;
         this.selectedAppeal = undefined;
         this.selectedAppealIds = [];
-        this.stopAppealAutoRefresh();
     }
 
-    startAppealAutoRefresh() {
-        this.stopAppealAutoRefresh();
-        this.appealRefreshTimer = window.setInterval(() => {
-            if (this.showAppealsScreen && document.visibilityState !== 'hidden') {
-                this.loadPendingAppeals({ silent: true });
-            }
-        }, 1000);
-    }
-
-    stopAppealAutoRefresh() {
-        if (this.appealRefreshTimer) {
-            window.clearInterval(this.appealRefreshTimer);
-            this.appealRefreshTimer = undefined;
-        }
-    }
-
-    handleWindowFocus() {
-        if (this.showAppealsScreen) {
-            this.loadPendingAppeals({ silent: true });
-        }
-    }
-
-    async loadPendingAppeals(options = {}) {
-        const forceRefresh = options.force === true;
+    async loadPendingAppeals({ force = false, showLoading = true } = {}) {
+        const forceRefresh = force;
         if (this.isRefreshingAppeals && !forceRefresh) {
             this.appealsRefreshQueued = true;
             return;
@@ -126,8 +94,7 @@ export default class AdminAssessmentDashboard extends LightningElement {
         if (forceRefresh) this.appealsRefreshQueued = false;
         const requestId = ++this.appealsRefreshRequestId;
         this.isRefreshingAppeals = true;
-        const silent = options.silent === true;
-        if (!silent) this.isAppealsLoading = true;
+        if (showLoading) this.isAppealsLoading = true;
         const selectedIdsBeforeRefresh = new Set(this.selectedAppealIds);
         try {
             const appeals = await getPendingAppealsForDashboard();
@@ -148,17 +115,17 @@ export default class AdminAssessmentDashboard extends LightningElement {
                 if (!this.selectedAppeal) this.showAppealDetail = false;
             }
         } catch (error) {
-            if (requestId === this.appealsRefreshRequestId && !silent) {
+            if (requestId === this.appealsRefreshRequestId) {
                 this.showToast('Error', error?.body?.message ?? error?.message ?? 'Could not load pending appeals.', 'error');
             }
         } finally {
             if (requestId === this.appealsRefreshRequestId) {
-                if (!silent) this.isAppealsLoading = false;
+                if (showLoading) this.isAppealsLoading = false;
                 this.isRefreshingAppeals = false;
             }
             if (requestId === this.appealsRefreshRequestId && this.appealsRefreshQueued && this.showAppealsScreen) {
                 this.appealsRefreshQueued = false;
-                this.loadPendingAppeals({ silent: true });
+                this.loadPendingAppeals({ showLoading: false });
             }
         }
     }
@@ -202,7 +169,7 @@ export default class AdminAssessmentDashboard extends LightningElement {
             const reviewedIds = new Set(this.selectedAppealIds);
             this.pendingAppeals = this.pendingAppeals.filter((appeal) => !reviewedIds.has(appeal.Id));
             this.selectedAppealIds = [];
-            await this.loadPendingAppeals({ silent: true, force: true });
+            await this.loadPendingAppeals({ showLoading: false, force: true });
         } catch (error) {
             this.showToast('Error', error?.body?.message ?? error?.message ?? 'Could not review selected appeals.', 'error');
         } finally {

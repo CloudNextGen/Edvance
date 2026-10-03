@@ -122,6 +122,14 @@ export default class PortalHome extends LightningElement {
             });
         }
 
+        if (this.profileDetails?.mentor) {
+            cards.push({
+                key: 'mentor',
+                label: 'Mentor',
+                profile: this.profileDetails.mentor
+            });
+        }
+
         return cards;
     }
 

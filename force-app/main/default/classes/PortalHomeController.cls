@@ -20,10 +20,13 @@ public with sharing class PortalHomeController {
                 SELECT
                     HR__c,
                     Manager__c,
+                    Mentor__c,
                     HR__r.Name,
                     Manager__r.Name,
+                    Mentor__r.Name,
                     HR_Email__c,
-                    Manager_Email__c
+                    Manager_Email__c,
+                    Mentor_Email__c
                 FROM Contact
                 WHERE Id = :users[0].ContactId
                 WITH SYSTEM_MODE
@@ -41,6 +44,13 @@ public with sharing class PortalHomeController {
                 result.put(
                     'manager',
                     buildProfileRecord(currentContact.Manager__r.Name, currentContact.Manager_Email__c)
+                );
+            }
+
+            if (currentContact.Mentor__c != null) {
+                result.put(
+                    'mentor',
+                    buildProfileRecord(currentContact.Mentor__r.Name, currentContact.Mentor_Email__c)
                 );
             }
         } catch (Exception e) {

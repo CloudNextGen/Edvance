@@ -2,11 +2,19 @@ public without sharing class AdminDashboardController {
     
     @AuraEnabled(cacheable=true)
     public static List<Contact> getExperienceUsers() {
+        Id currentUserId = UserInfo.getUserId();
+
         return [
             SELECT Id, Name, Email, Title, Account.Name,
                    (SELECT Id FROM Assignment_Eligibilities__r)
             FROM Contact 
-            WHERE Id IN (SELECT ContactId FROM User WHERE IsActive = true)
+            WHERE Id IN (
+                SELECT ContactId 
+                FROM User 
+                WHERE IsActive = true 
+                AND Id != :currentUserId
+                AND ContactId != null
+            )
             ORDER BY Name ASC
         ];
     }

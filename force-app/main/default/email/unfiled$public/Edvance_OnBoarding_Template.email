@@ -79,6 +79,7 @@
                     <a href="{!Community_Url}" style="color:#0b5fff; text-decoration:none;">{!Community_Url}</a>
                   </p>
                   <p style="margin:0; font-size:13px; color:#475467;"><strong>Email:</strong> {!Receiving_User.Email}</p>
+<p style="margin:0; font-size:13px; color:#475467;"><strong>Email:</strong> {!Receiving_User.Username}</p>
                 </td>
               </tr>
             </table>

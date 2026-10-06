@@ -17,7 +17,7 @@
  * Photos: required for Office Check-In only. Office Check-Out needs no photo.
  * Lunch In / Lunch Out follow Need_Lunch_Photo__c.
  *
- * Lateness is calculated the same way for every day of the week.
+ * Saturday lateness can be excluded through Assessment_Portal_Config__mdt.Exclude_Saturday__c.
  *
  * Assumes Attendance_Config__mdt (Custom Metadata Type) has fields:
  *   Office_Name__c (Text), Latitude__c (Number), Longitude__c (Number),
@@ -30,6 +30,7 @@ public with sharing class AttendanceController {
 
     private static final Decimal DEDUCTION_AMOUNT = 50;
     private static final Integer MONTHLY_LATE_GRACE_DAYS = 3;
+    @TestVisible private static Boolean excludeSaturdayOverride;
 
     // Lunch Check-In = lunch starts, Lunch Check-Out = lunch ends
     private static final List<String> PUNCH_SEQUENCE = new List<String>{
@@ -167,8 +168,9 @@ public with sharing class AttendanceController {
                 logRec.Rejection_Reason__c = !accuracyOk ? 'Your attendance is not captured due to the Poor GPS accuracy, Please try again.' : 'Your attendance is not captured as you are outside the allowed office radius.';
             }
 
-            // Lateness is evaluated on Office Check-In and the late lunch-return event,
-            // Lunch Check-Out. Both use the same monthly three-distinct-late-day grace.
+            // Lateness is evaluated on Office Check-In and Lunch Check-Out. Both share
+            // the monthly three-distinct-late-day grace; after grace, each late event
+            // gets its own deduction, even when both events are late on the same date.
             if (isValid && (punchType == 'Office Check-In' || punchType == 'Lunch Check-Out')) {
                 Integer lateMinutes = calculateLateMinutes(punchType, office, summary, logRec.Event_Timestamp__c);
                 logRec.Late_Minutes__c = lateMinutes;
@@ -441,11 +443,37 @@ public with sharing class AttendanceController {
         update s;
     }
 
+    @TestVisible
+    private static Boolean shouldExcludeSaturday(Date attendanceDate) {
+        Boolean excludeSaturday = excludeSaturdayOverride;
+        if (excludeSaturday == null) {
+            List<Assessment_Portal_Config__mdt> configs = [
+                SELECT Exclude_Saturday__c
+                FROM Assessment_Portal_Config__mdt
+                LIMIT 1
+            ];
+            excludeSaturday = !configs.isEmpty() && configs[0].Exclude_Saturday__c == true;
+        }
+        return excludeSaturday && attendanceDate != null && isSaturday(attendanceDate);
+    }
+
+    private static Boolean isSaturday(Date attendanceDate) {
+        if (attendanceDate == null) {
+            return false;
+        }
+        Datetime midnight = Datetime.newInstance(attendanceDate, Time.newInstance(0, 0, 0, 0));
+        return midnight.format('E') == 'Sat';
+    }
 
     private static Integer calculateLateMinutes(String punchType, Attendance_Config__mdt office,
                                                  Attendance_Summary__c summary, Datetime eventTime) {
         Integer diffMinutes = 0;
 
+        // Keep the attendance punch and timestamps, but do not treat it as late
+        // (or let it trigger a deduction) when Saturday exclusion is configured.
+        if (shouldExcludeSaturday(Date.today())) {
+            return 0;
+        }
 
         if (punchType == 'Office Check-In' && String.isNotBlank(office.Office_Start_Time__c)) {
             try {
@@ -479,15 +507,15 @@ public with sharing class AttendanceController {
         return diffMinutes > 0 ? diffMinutes : 0;
     }
 
-    // Shared by office arrival and late lunch return: the first three distinct dates
-    // with any late event in a calendar month have no deduction. Later late dates do.
+    // Office arrival and late lunch share the first three distinct late dates in a
+    // calendar month. After that grace, each late event is charged independently.
+    @TestVisible
     private static Boolean isBeyondMonthlyLateGrace(Id employeeId, Date lateDate) {
         Date monthStart = lateDate.toStartOfMonth();
         Set<Date> priorLateDates = new Set<Date>();
-        Boolean deductionAlreadyAppliedToday = false;
 
         for (Attendance_Log__c lateLog : [
-            SELECT Attendance_Summary__r.Date__c, Deduction_Amount__c
+            SELECT Attendance_Summary__r.Date__c
             FROM Attendance_Log__c
             WHERE Employee__c = :employeeId
               AND Is_Valid__c = true
@@ -496,15 +524,15 @@ public with sharing class AttendanceController {
               AND Attendance_Summary__r.Date__c <= :lateDate
         ]) {
             Date recordedLateDate = lateLog.Attendance_Summary__r.Date__c;
-            if (recordedLateDate == lateDate) {
-                deductionAlreadyAppliedToday = deductionAlreadyAppliedToday
-                    || (lateLog.Deduction_Amount__c != null && lateLog.Deduction_Amount__c > 0);
-            } else {
+            if (shouldExcludeSaturday(recordedLateDate)) {
+                continue;
+            }
+            if (recordedLateDate != lateDate) {
                 priorLateDates.add(recordedLateDate);
             }
         }
 
-        return !deductionAlreadyAppliedToday && priorLateDates.size() >= MONTHLY_LATE_GRACE_DAYS;
+        return priorLateDates.size() >= MONTHLY_LATE_GRACE_DAYS;
     }
 
     private static void attachPhoto(Id logRecordId, String base64Data, String contentType) {
@@ -537,7 +565,7 @@ public with sharing class AttendanceController {
     private static Attendance_Config__mdt getOfficeConfig() {
         List<Attendance_Config__mdt> configs = [
             SELECT Latitude__c, Longitude__c, Allowed_Radius_Meters__c,
-                   Office_Start_Time__c, Lunch_Duration_Minutes__c, Need_Lunch_Photo__c
+                     Office_Start_Time__c, Lunch_Duration_Minutes__c, Need_Lunch_Photo__c
             FROM Attendance_Config__mdt
             LIMIT 1
         ];

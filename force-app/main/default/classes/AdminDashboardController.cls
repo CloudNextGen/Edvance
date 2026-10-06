@@ -5,7 +5,7 @@ public without sharing class AdminDashboardController {
         Id currentUserId = UserInfo.getUserId();
 
         return [
-            SELECT Id, Name, Email, Title, Account.Name,
+            SELECT Id, Name, Email, Phone, Title, Account.Name,
                    (SELECT Id FROM Assignment_Eligibilities__r)
             FROM Contact 
             WHERE Id IN (

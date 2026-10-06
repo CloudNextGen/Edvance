@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Auto_Assign_Next_File__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>This checkbox used to assign next file when user complete their first file if checked .</description>
+    <fieldManageability>DeveloperControlled</fieldManageability>
+    <label>Auto Assign Next File</label>
+    <type>Checkbox</type>
+</CustomField>

@@ -14,6 +14,24 @@
             </div>
             
             <div class="header-right">
+                <!-- DATE FILTERS -->
+                <div class="filter-toolbar">
+                    <div class="filter-pill-group">
+                        <button type="button" class={filterClassAll} data-filter="all" onclick={handleFilterSelect}>All</button>
+                        <button type="button" class={filterClass7} data-filter="7d" onclick={handleFilterSelect}>7 Days</button>
+                        <button type="button" class={filterClass30} data-filter="30d" onclick={handleFilterSelect}>30 Days</button>
+                        <button type="button" class={filterClassCustom} data-filter="custom" onclick={handleFilterSelect}>Custom</button>
+                    </div>
+
+                    <template if:true={isCustomFilter}>
+                        <div class="custom-range-inputs">
+                            <lightning-input type="date" name="customStart" value={customStart} onchange={handleCustomDateChange} variant="label-hidden" title="From date"></lightning-input>
+                            <span class="range-sep">—</span>
+                            <lightning-input type="date" name="customEnd" value={customEnd} onchange={handleCustomDateChange} variant="label-hidden" title="To date"></lightning-input>
+                        </div>
+                    </template>
+                </div>
+
                 <div class="pool-summary">
                     <div class="pool-total">Total Treats Pool: <strong>{totalPoolFormatted}</strong></div>
                     <div class="pool-top">Top Contributor: <strong>{topContributorName}</strong></div>
@@ -56,7 +74,7 @@
             <div class="empty-state">
                 <div class="empty-icon">✨</div>
                 <p class="empty-title">No Outstanding Deductions</p>
-                <p class="empty-desc">All employees have settled their deductions. Great work!</p>
+                <p class="empty-desc">No deductions found for the selected period.</p>
             </div>
         </template>
 
@@ -64,7 +82,7 @@
         <template if:true={hasResults}>
             <div class="ceo-layout">
 
-                <!-- ===== #1 : THE UNOFFICIAL CEO (highest pending deduction) ===== -->
+                <!-- ===== #1 : THE UNOFFICIAL CEO ===== -->
                 <article class="ceo-card">
                     <div class="ceo-banner">
                         <svg class="ceo-confetti" viewBox="0 0 600 120" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
@@ -142,7 +160,6 @@
                         </div>
                     </div>
 
-                    <!-- ACTIONS (HR only) -->
                     <template if:true={isHr}>
                         <div class="card-actions ceo-actions">
                             <button type="button" class="action-btn action-btn-primary" data-id={ceoEmployee.employeeId} onclick={handleRedeemClick}>Redeem</button>
@@ -156,14 +173,11 @@
                     <div class="deductions-container ceo-others">
                         <template for:each={otherEmployees} for:item="employee">
                             <article key={employee.employeeId} class="deduction-card">
-                                <!-- RANK BADGE -->
                                 <div class="rank-badge" data-rank={employee.rank}>
                                     #{employee.rank}
                                 </div>
 
-                                <!-- CARD HEADER -->
                                 <div class="card-content">
-                                    <!-- EMPLOYEE INFO -->
                                     <div class="employee-info">
                                         <div class="employee-avatar">
                                             {employee.initials}
@@ -174,7 +188,6 @@
                                         </div>
                                     </div>
 
-                                    <!-- DEDUCTION AMOUNT -->
                                     <div class="deduction-amount">
                                         <span class="amount-label">Pending</span>
                                         <span class="amount-value">{employee.deductionFormatted}</span>
@@ -184,7 +197,6 @@
                                     </div>
                                 </div>
 
-                                <!-- CARD DETAILS: LATE DAYS -->
                                 <div class="card-details">
                                     <div class="detail-row">
                                         <div class="detail-item">
@@ -198,7 +210,6 @@
                                     </div>
                                 </div>
 
-                                <!-- ACTIONS (HR only) -->
                                 <template if:true={isHr}>
                                     <div class="card-actions">
                                         <button type="button" class="action-btn action-btn-primary" data-id={employee.employeeId} onclick={handleRedeemClick}>Redeem</button>
@@ -249,7 +260,7 @@
                     <!-- HISTORY -->
                     <template if:true={isHistoryModal}>
                         <template if:true={isHistoryLoading}><p class="history-empty">Loading...</p></template>
-                        <template if:true={noHistory}><p class="history-empty">No payments recorded this month.</p></template>
+                        <template if:true={noHistory}><p class="history-empty">No payments recorded for this period.</p></template>
                         <template if:true={hasHistory}>
                             <template for:each={history} for:item="p">
                                 <div key={p.id} class="history-row">

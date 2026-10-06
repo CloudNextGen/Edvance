@@ -2,13 +2,14 @@
 // sums the records they can see (admin sees all, community user sees a subset) -> different amounts.
 // Writes/history are still protected by assertHr() (custom permission Portal_HR_Access).
 public without sharing class AttendanceDeductionController {
+    @TestVisible private static Boolean excludeSaturdayOverride;
 
     public class DeductionSummaryWrapper {
         @AuraEnabled public String employeeId { get; set; }
         @AuraEnabled public String employeeName { get; set; }
-        @AuraEnabled public Decimal totalDeductionAmount { get; set; } // gross (all time)
-        @AuraEnabled public Decimal paidAmount { get; set; }           // redeemed so far (all time)
-        @AuraEnabled public Decimal remainingAmount { get; set; }      // gross - paid
+        @AuraEnabled public Decimal totalDeductionAmount { get; set; } // gross incurred in filtered period
+        @AuraEnabled public Decimal paidAmount { get; set; }           // paid portion applied to this period
+        @AuraEnabled public Decimal remainingAmount { get; set; }      // pending in this period
         @AuraEnabled public Decimal offLateMinutes { get; set; }
         @AuraEnabled public Decimal lunchLateMinutes { get; set; }
         @AuraEnabled public Integer officeLateDays { get; set; }
@@ -29,9 +30,6 @@ public without sharing class AttendanceDeductionController {
         @AuraEnabled public String recordedBy { get; set; }
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  HR gate: custom permission "Portal_HR_Access"             */
-    /* ------------------------------------------------------------------ */
     @AuraEnabled(cacheable=true)
     public static Boolean canManageDeductions() {
         return FeatureManagement.checkPermission('Portal_HR_Access');
@@ -43,27 +41,64 @@ public without sharing class AttendanceDeductionController {
         }
     }
 
+    private static Boolean getExcludeSaturdaySetting() {
+        if (excludeSaturdayOverride != null) {
+            return excludeSaturdayOverride;
+        }
+        List<Assessment_Portal_Config__mdt> configs = [
+            SELECT Exclude_Saturday__c
+            FROM Assessment_Portal_Config__mdt
+            LIMIT 1
+        ];
+        return !configs.isEmpty() && configs[0].Exclude_Saturday__c == true;
+    }
+
     /* ------------------------------------------------------------------ */
-    /*  READ: employees by REMAINING deduction          */
+    /*  READ: employees by REMAINING deduction with FIFO reconciliation   */
     /* ------------------------------------------------------------------ */
     @AuraEnabled(cacheable=true)
-    public static List<DeductionSummaryWrapper> getTopDeductionsEmployees() {
+    public static List<DeductionSummaryWrapper> getTopDeductionsEmployees(Date startDate, Date endDate) {
         List<DeductionSummaryWrapper> resultList = new List<DeductionSummaryWrapper>();
 
         try {
-            // 1) Gross deduction per employee (no LIMIT: ranking must be on NET amount)
+            Date validStart = startDate;
+            Date validEnd = endDate;
+            if (validStart != null && validEnd != null && validStart > validEnd) {
+                Date temp = validStart;
+                validStart = validEnd;
+                validEnd = temp;
+            }
+
+            // Saturday Filter Clause
+            String saturdayFilter = getExcludeSaturdaySetting()
+                ? ' AND DAY_IN_WEEK(Date__c) != 7 '
+                : '';
+
+            // Date condition for Attendance Summary records in this window
+            String attDateFilter = '';
+            if (validStart != null) {
+                attDateFilter += ' AND Date__c >= :validStart ';
+            }
+            if (validEnd != null) {
+                attDateFilter += ' AND Date__c <= :validEnd ';
+            }
+
+            // 1) Gross deductions & late minutes incurred strictly within the selected window
+            String grossQuery = 
+                'SELECT Employee__c empId, ' +
+                '       SUM(Total_Deduction_Amount__c) totalDeduction, ' +
+                '       SUM(Office_Late_Minutes__c) totalOfficeLate, ' +
+                '       SUM(Lunch_Late_Minutes__c) totalLunchLate ' +
+                'FROM Attendance_Summary__c ' +
+                'WHERE Total_Deduction_Amount__c > 0 ' +
+                'AND Employee__c != null ' +
+                attDateFilter +
+                saturdayFilter +
+                'WITH SYSTEM_MODE ' +
+                'GROUP BY Employee__c';
+
             Map<Id, DeductionSummaryWrapper> byEmp = new Map<Id, DeductionSummaryWrapper>();
-            for (AggregateResult ar : [
-                SELECT Employee__c empId,
-                       SUM(Total_Deduction_Amount__c) totalDeduction,
-                       SUM(Office_Late_Minutes__c) totalOfficeLate,
-                       SUM(Lunch_Late_Minutes__c) totalLunchLate
-                FROM Attendance_Summary__c
-                WHERE Total_Deduction_Amount__c > 0
-                AND Employee__c != null
-                WITH SYSTEM_MODE
-                GROUP BY Employee__c
-            ]) {
+            for (AggregateResult ar : (List<AggregateResult>) Database.query(grossQuery)) {
                 Id empId = (Id) ar.get('empId');
                 DeductionSummaryWrapper w = new DeductionSummaryWrapper();
                 w.employeeId = empId;
@@ -71,75 +106,144 @@ public without sharing class AttendanceDeductionController {
                 w.offLateMinutes = (Decimal) ar.get('totalOfficeLate');
                 w.lunchLateMinutes = (Decimal) ar.get('totalLunchLate');
                 w.paidAmount = 0;
+                w.remainingAmount = 0;
                 byEmp.put(empId, w);
             }
 
             if (byEmp.isEmpty()) return resultList;
 
-            // 2) All payments already made against these deductions
+            Set<Id> candidateEmpIds = byEmp.keySet();
+
+            // 2) Total all-time gross deductions for these candidates (honoring saturday config)
+            Map<Id, Decimal> allTimeGrossMap = new Map<Id, Decimal>();
+            String allTimeGrossQuery = 
+                'SELECT Employee__c empId, SUM(Total_Deduction_Amount__c) totalGross ' +
+                'FROM Attendance_Summary__c ' +
+                'WHERE Employee__c IN :candidateEmpIds AND Total_Deduction_Amount__c > 0 ' +
+                saturdayFilter +
+                'WITH SYSTEM_MODE ' +
+                'GROUP BY Employee__c';
+
+            for (AggregateResult ar : (List<AggregateResult>) Database.query(allTimeGrossQuery)) {
+                allTimeGrossMap.put((Id) ar.get('empId'), (Decimal) ar.get('totalGross'));
+            }
+
+            // 3) Total all-time payments made by these candidates
+            Map<Id, Decimal> allTimePaidMap = new Map<Id, Decimal>();
             for (AggregateResult ar : [
-                SELECT Employee__c empId, SUM(Amount__c) paid
+                SELECT Employee__c empId, SUM(Amount__c) totalPaid
                 FROM Deduction_Payment__c
-                WHERE Employee__c IN :byEmp.keySet()
+                WHERE Employee__c IN :candidateEmpIds
                 WITH SYSTEM_MODE
                 GROUP BY Employee__c
             ]) {
-                DeductionSummaryWrapper w = byEmp.get((Id) ar.get('empId'));
-                if (w != null && ar.get('paid') != null) w.paidAmount = (Decimal) ar.get('paid');
+                allTimePaidMap.put((Id) ar.get('empId'), (Decimal) ar.get('totalPaid'));
             }
 
-            // 3) Remaining = gross - paid; keep every outstanding employee and rank desc
+            // 4) Prior gross debt incurred BEFORE validStart (to absorb payments chronologically)
+            Map<Id, Decimal> priorGrossMap = new Map<Id, Decimal>();
+            if (validStart != null) {
+                String priorQuery = 
+                    'SELECT Employee__c empId, SUM(Total_Deduction_Amount__c) priorGross ' +
+                    'FROM Attendance_Summary__c ' +
+                    'WHERE Employee__c IN :candidateEmpIds ' +
+                    'AND Total_Deduction_Amount__c > 0 ' +
+                    'AND Date__c < :validStart ' +
+                    saturdayFilter +
+                    'WITH SYSTEM_MODE ' +
+                    'GROUP BY Employee__c';
+
+                for (AggregateResult ar : (List<AggregateResult>) Database.query(priorQuery)) {
+                    priorGrossMap.put((Id) ar.get('empId'), (Decimal) ar.get('priorGross'));
+                }
+            }
+
+            // 5) FIFO Reconciliation
             List<DeductionSummaryWrapper> pending = new List<DeductionSummaryWrapper>();
             for (DeductionSummaryWrapper w : byEmp.values()) {
-                w.remainingAmount = w.totalDeductionAmount - w.paidAmount;
-                if (w.remainingAmount > 0) pending.add(w);
+                Id empId = (Id) w.employeeId;
+                Decimal grossAllTime = allTimeGrossMap.containsKey(empId) ? allTimeGrossMap.get(empId) : 0;
+                Decimal totalPaid    = allTimePaidMap.containsKey(empId) ? allTimePaidMap.get(empId) : 0;
+                Decimal priorGross   = priorGrossMap.containsKey(empId) ? priorGrossMap.get(empId) : 0;
+
+                // What payment remains after clearing debts older than validStart
+                Decimal remainingPaidForWindow = Math.max(0, totalPaid - priorGross);
+
+                // What is still unpaid in this window
+                Decimal windowRemaining = Math.max(0, w.totalDeductionAmount - remainingPaidForWindow);
+
+                // Guardrail: Can never exceed total all-time debt
+                Decimal trueRemainingOverall = Math.max(0, grossAllTime - totalPaid);
+
+                w.remainingAmount = Math.min(windowRemaining, trueRemainingOverall);
+                w.paidAmount = Math.max(0, w.totalDeductionAmount - w.remainingAmount);
+
+                // Only show active outstanding debt on the leaderboard
+                if (w.remainingAmount > 0) {
+                    pending.add(w);
+                }
             }
+
+            if (pending.isEmpty()) return resultList;
+
             pending.sort(new RemainingDescComparator());
             resultList.addAll(pending);
 
-            if (resultList.isEmpty()) return resultList;
-
             Set<Id> empIds = new Set<Id>();
-            for (DeductionSummaryWrapper w : resultList) empIds.add((Id) w.employeeId);
+            for (DeductionSummaryWrapper w : resultList) {
+                empIds.add((Id) w.employeeId);
+            }
 
-            // 4) Names
+            // 6) Contact Names
             Map<Id, String> employeeNameMap = new Map<Id, String>();
             for (Contact c : [SELECT Id, Name FROM Contact WHERE Id IN :empIds WITH SYSTEM_MODE]) {
                 employeeNameMap.put(c.Id, c.Name);
             }
 
-            // 5) Late day counts across all attendance history
+            // 7) Late Days counts within the filtered window
+            String offLateQuery = 
+                'SELECT Employee__c empId, COUNT(Id) totalDays ' +
+                'FROM Attendance_Summary__c ' +
+                'WHERE Employee__c IN :empIds AND Office_Late_Minutes__c > 0 ' +
+                attDateFilter +
+                saturdayFilter +
+                'WITH SYSTEM_MODE ' +
+                'GROUP BY Employee__c';
+
+            String lunchLateQuery = 
+                'SELECT Employee__c empId, COUNT(Id) totalDays ' +
+                'FROM Attendance_Summary__c ' +
+                'WHERE Employee__c IN :empIds AND Lunch_Late_Minutes__c > 0 ' +
+                attDateFilter +
+                saturdayFilter +
+                'WITH SYSTEM_MODE ' +
+                'GROUP BY Employee__c';
+
             Map<Id, Integer> officeLateDaysMap = new Map<Id, Integer>();
             Map<Id, Integer> lunchLateDaysMap = new Map<Id, Integer>();
-            for (AggregateResult a : [
-                SELECT Employee__c empId, COUNT(Id) totalDays
-                FROM Attendance_Summary__c
-                WHERE Employee__c IN :empIds AND Office_Late_Minutes__c > 0
-                WITH SYSTEM_MODE
-                GROUP BY Employee__c
-            ]) {
+
+            for (AggregateResult a : (List<AggregateResult>) Database.query(offLateQuery)) {
                 officeLateDaysMap.put((Id) a.get('empId'), (Integer) a.get('totalDays'));
             }
-            for (AggregateResult a : [
-                SELECT Employee__c empId, COUNT(Id) totalDays
-                FROM Attendance_Summary__c
-                WHERE Employee__c IN :empIds AND Lunch_Late_Minutes__c > 0
-                WITH SYSTEM_MODE
-                GROUP BY Employee__c
-            ]) {
+            for (AggregateResult a : (List<AggregateResult>) Database.query(lunchLateQuery)) {
                 lunchLateDaysMap.put((Id) a.get('empId'), (Integer) a.get('totalDays'));
             }
 
-            // 6) Latest summary record across all attendance history
+            // 8) Latest summary date within the filtered window
+            String latestRecQuery = 
+                'SELECT Id, Employee__c, Date__c ' +
+                'FROM Attendance_Summary__c ' +
+                'WHERE Employee__c IN :empIds ' +
+                attDateFilter +
+                saturdayFilter +
+                'WITH SYSTEM_MODE ' +
+                'ORDER BY Date__c DESC';
+
             Map<Id, Attendance_Summary__c> latestRecordMap = new Map<Id, Attendance_Summary__c>();
-            for (Attendance_Summary__c rec : [
-                SELECT Id, Employee__c, Date__c
-                FROM Attendance_Summary__c
-                WHERE Employee__c IN :empIds
-                WITH SYSTEM_MODE
-                ORDER BY Date__c DESC
-            ]) {
-                if (!latestRecordMap.containsKey(rec.Employee__c)) latestRecordMap.put(rec.Employee__c, rec);
+            for (Attendance_Summary__c rec : (List<Attendance_Summary__c>) Database.query(latestRecQuery)) {
+                if (!latestRecordMap.containsKey(rec.Employee__c)) {
+                    latestRecordMap.put(rec.Employee__c, rec);
+                }
             }
 
             for (DeductionSummaryWrapper w : resultList) {
@@ -162,7 +266,7 @@ public without sharing class AttendanceDeductionController {
     }
 
     /* ------------------------------------------------------------------ */
-    /*  WRITE: redeem (full or partial) -> creates a payment record        */
+    /*  WRITE: redeem                                                     */
     /* ------------------------------------------------------------------ */
     @AuraEnabled
     public static PaymentWrapper redeemDeduction(Id employeeId, Decimal amount, Date paymentDate,
@@ -174,14 +278,16 @@ public without sharing class AttendanceDeductionController {
             Date payDate = paymentDate != null ? paymentDate : Date.today();
             if (payDate > Date.today()) throw new AuraHandledException('Payment date cannot be in the future.');
 
-            // Re-check the all-time balance on the server (never trust the amount shown in the UI)
+            String saturdayFilter = getExcludeSaturdaySetting()
+                ? ' AND DAY_IN_WEEK(Date__c) != 7 '
+                : '';
+
             Decimal gross = 0;
-            for (AggregateResult ar : [
-                SELECT SUM(Total_Deduction_Amount__c) t
-                FROM Attendance_Summary__c
-                WHERE Employee__c = :employeeId AND Total_Deduction_Amount__c > 0
-                WITH SYSTEM_MODE
-            ]) {
+            for (AggregateResult ar : Database.query(
+                'SELECT SUM(Total_Deduction_Amount__c) t FROM Attendance_Summary__c ' +
+                'WHERE Employee__c = :employeeId AND Total_Deduction_Amount__c > 0 ' +
+                saturdayFilter + 'WITH SYSTEM_MODE'
+            )) {
                 if (ar.get('t') != null) gross = (Decimal) ar.get('t');
             }
             Decimal paid = 0;
@@ -227,7 +333,7 @@ public without sharing class AttendanceDeductionController {
     }
 
     /* ------------------------------------------------------------------ */
-    /*  READ: payment history for one employee (all time)                  */
+    /*  READ: payment history                                             */
     /* ------------------------------------------------------------------ */
     @AuraEnabled
     public static List<PaymentWrapper> getPaymentHistory(Id employeeId) {

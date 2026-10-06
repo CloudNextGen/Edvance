@@ -7,7 +7,19 @@
         <value xsi:type="xsd:double">5.0</value>
     </values>
     <values>
+        <field>Auto_Assign_Next_File__c</field>
+        <value xsi:type="xsd:boolean">false</value>
+    </values>
+    <values>
+        <field>Auto_Assign_Next_Folder__c</field>
+        <value xsi:type="xsd:boolean">false</value>
+    </values>
+    <values>
         <field>Auto_Create_Assignment_Eligibility__c</field>
+        <value xsi:type="xsd:boolean">false</value>
+    </values>
+    <values>
+        <field>Exclude_Saturday__c</field>
         <value xsi:type="xsd:boolean">false</value>
     </values>
     <values>

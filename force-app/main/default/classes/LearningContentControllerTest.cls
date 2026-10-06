@@ -235,6 +235,7 @@ private class LearningContentControllerTest {
 
         Map<String, Object> result;
         System.runAs(portalUser) {
+            LearningContentController.autoAssignNextFileOverride = true;
             Test.startTest();
             result = LearningContentController.markFileComplete(fileA1.Id);
             Test.stopTest();
@@ -252,6 +253,40 @@ private class LearningContentControllerTest {
         List<Learning_Access__c> a2Access = [SELECT Access_Status__c FROM Learning_Access__c WHERE Learning_File__c = :fileA2.Id AND Contact__c = :con.Id];
         System.assertEquals(1, a2Access.size(), 'Next file in the folder should now have an access record');
         System.assertEquals('Granted', a2Access[0].Access_Status__c);
+    }
+
+    @isTest
+    static void testMarkFileComplete_DoesNotUnlockNextFileWhenDisabled() {
+        User portalUser = getPortalUserOrNull();
+        if (portalUser == null) {
+            System.debug('Skipping: no community/portal profile available in this org.');
+            return;
+        }
+
+        Contact con = getLearnerContact();
+        Learning_File__c fileA1 = getFileByName('A1 - Intro');
+        Learning_File__c fileA2 = getFileByName('A2 - Deep Dive');
+        insert new Learning_Access__c(
+            Contact__c = con.Id, Learning_File__c = fileA1.Id,
+            Access_Status__c = 'Granted', Completion_Status__c = 'Not Started', Name = 'A1 - Learner'
+        );
+
+        Map<String, Object> result;
+        System.runAs(portalUser) {
+            LearningContentController.autoAssignNextFileOverride = false;
+            Test.startTest();
+            result = LearningContentController.markFileComplete(fileA1.Id);
+            Test.stopTest();
+        }
+
+        System.assertEquals(true, result.get('success'));
+        System.assertEquals(null, result.get('nextFileId'));
+        System.assertEquals(false, result.get('nextFolderUnlocked'));
+        System.assertEquals(0, [
+            SELECT COUNT()
+            FROM Learning_Access__c
+            WHERE Contact__c = :con.Id AND Learning_File__c = :fileA2.Id
+        ], 'The next file should not be assigned while auto assignment is disabled');
     }
 
     @isTest
@@ -277,6 +312,8 @@ private class LearningContentControllerTest {
 
         Map<String, Object> result;
         System.runAs(portalUser) {
+            LearningContentController.autoAssignNextFileOverride = false;
+            LearningContentController.autoAssignNextFolderOverride = true;
             Test.startTest();
             result = LearningContentController.markFileComplete(fileA2.Id);
             Test.stopTest();
@@ -290,6 +327,47 @@ private class LearningContentControllerTest {
         System.assertEquals(1, b1Access.size(), 'First file of the next content folder should be granted');
         System.assertEquals('Granted', b1Access[0].Access_Status__c);
         System.assertEquals('Not Started', b1Access[0].Completion_Status__c);
+    }
+
+    @isTest
+    static void testMarkFileComplete_DoesNotUnlockNextFolderWhenFolderAssignmentDisabled() {
+        User portalUser = getPortalUserOrNull();
+        if (portalUser == null) {
+            System.debug('Skipping: no community/portal profile available in this org.');
+            return;
+        }
+
+        Contact con = getLearnerContact();
+        Learning_File__c fileA1 = getFileByName('A1 - Intro');
+        Learning_File__c fileA2 = getFileByName('A2 - Deep Dive');
+        Learning_File__c fileB1 = getFileByName('B1 - Overview');
+        insert new List<Learning_Access__c>{
+            new Learning_Access__c(
+                Contact__c = con.Id, Learning_File__c = fileA1.Id,
+                Access_Status__c = 'Granted', Completion_Status__c = 'Completed', Name = 'A1 - Learner'
+            ),
+            new Learning_Access__c(
+                Contact__c = con.Id, Learning_File__c = fileA2.Id,
+                Access_Status__c = 'Granted', Completion_Status__c = 'Not Started', Name = 'A2 - Learner'
+            )
+        };
+
+        Map<String, Object> result;
+        System.runAs(portalUser) {
+            LearningContentController.autoAssignNextFileOverride = true;
+            LearningContentController.autoAssignNextFolderOverride = false;
+            Test.startTest();
+            result = LearningContentController.markFileComplete(fileA2.Id);
+            Test.stopTest();
+        }
+
+        System.assertEquals(true, result.get('success'));
+        System.assertEquals(false, result.get('nextFolderUnlocked'));
+        System.assertEquals(0, [
+            SELECT COUNT()
+            FROM Learning_Access__c
+            WHERE Contact__c = :con.Id AND Learning_File__c = :fileB1.Id
+        ], 'Next-folder access should remain unassigned when Auto_Assign_Next_Folder__c is disabled');
     }
 
     @isTest
@@ -309,6 +387,8 @@ private class LearningContentControllerTest {
 
         Map<String, Object> result;
         System.runAs(portalUser) {
+            LearningContentController.autoAssignNextFileOverride = true;
+            LearningContentController.autoAssignNextFolderOverride = true;
             Test.startTest();
             result = LearningContentController.markFileComplete(fileB1.Id);
             Test.stopTest();

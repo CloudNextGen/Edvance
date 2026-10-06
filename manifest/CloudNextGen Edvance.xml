@@ -51,6 +51,7 @@
     <types>
         <members>Google_Collect</members>
         <members>Google_Drive</members>
+        <members>Microsoft_SharePoint</members>
         <name>CspTrustedSite</name>
     </types>
     <types>
@@ -62,6 +63,9 @@
         <members>Assessment_Portal_Config__mdt.Assignment_Page_Size__c</members>
         <members>Assessment_Portal_Config__mdt.Auto_Create_Assignment_Eligibility__c</members>
         <members>Assessment_Portal_Config__mdt.Question_Page_Size__c</members>
+        <members>Assessment_Portal_Config__mdt.Auto_Assign_Next_File__c</members>
+        <members>Assessment_Portal_Config__mdt.Auto_Assign_Next_Folder__c</members>
+        <members>Assessment_Portal_Config__mdt.Exclude_Saturday__c</members>
         <members>Assignment_Eligibility__c.Assignment__c</members>
         <members>Assignment_Eligibility__c.Contact__c</members>
         <members>Assignment_Eligibility__c.Current_Attempt_Number__c</members>

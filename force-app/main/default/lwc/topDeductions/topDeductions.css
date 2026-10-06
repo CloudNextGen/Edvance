@@ -14,6 +14,7 @@
     align-items: center;
     margin-bottom: 20px;
     gap: 16px;
+    flex-wrap: wrap;
 }
 
 .header-left {
@@ -69,11 +70,64 @@
     border-radius: 14px;
 }
 
-/* Header Right: Pool Summary Box & Refresh Button */
+/* Header Right & Filters */
 .header-right {
     display: flex;
     align-items: center;
     gap: 12px;
+    flex-wrap: wrap;
+}
+
+.filter-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.filter-pill-group {
+    display: inline-flex;
+    background: #e2e8f0;
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+}
+
+.filter-btn {
+    border: none;
+    background: transparent;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.filter-btn:hover {
+    color: #0f172a;
+}
+
+.filter-btn.active {
+    background: #ffffff;
+    color: #b8821a;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.custom-range-inputs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.custom-range-inputs lightning-input {
+    width: 125px;
+}
+
+.range-sep {
+    font-size: 12px;
+    color: #94a3b8;
+    font-weight: 700;
 }
 
 .pool-summary {
@@ -441,7 +495,6 @@
     color: #111827;
 }
 
-/* ACCESSIBILITY */
 .action-btn:focus,
 .refresh-btn:focus {
     outline: 2px solid #667eea;
@@ -453,7 +506,6 @@
     cursor: not-allowed;
 }
 
-/* PAID NOTE */
 .paid-note { 
     font-size: 0.7rem; 
     color: #6b7280; 
@@ -592,10 +644,7 @@
     margin: 1rem 0; 
 }
 
-/* ======================================================================
-   "THE UNOFFICIAL CEO" CARD (rank #1) & SCROLLABLE OTHERS
-   ====================================================================== */
-
+/* CEO CARD LAYOUT */
 .ceo-layout {
     display: grid;
     grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.75fr);
@@ -603,12 +652,10 @@
     align-items: start;
 }
 
-/* Only CEO exists: full width */
 .ceo-layout > .ceo-card:only-child {
     grid-column: 1 / -1;
 }
 
-/* Sticky/Fixed Big CEO Card */
 .ceo-card {
     position: sticky;
     top: 1rem;
@@ -620,20 +667,18 @@
     z-index: 10;
 }
 
-/* Scrollable Container for the remaining cards */
 .ceo-others {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 16px;
-    max-height: 480px;      /* Matches the height profile of the CEO card */
-    overflow-y: auto;       /* Enables vertical scrolling */
+    max-height: 480px;
+    overflow-y: auto;
     overflow-x: hidden;
-    padding-right: 6px;     /* Breathing room for scrollbar */
+    padding-right: 6px;
     padding-bottom: 6px;
     align-content: start;
 }
 
-/* Subtle, Modern Scrollbar */
 .ceo-others::-webkit-scrollbar {
     width: 6px;
 }
@@ -649,7 +694,6 @@
     background: #94a3b8;
 }
 
-/* CEO card visual details */
 .ceo-banner {
     position: relative;
     height: 112px;
@@ -805,16 +849,13 @@
     padding: 12px 20px 20px;
 }
 
-/* ======================================================================
-   RESPONSIVE & ZOOM STACKING
-   ====================================================================== */
-
+/* RESPONSIVE */
 @media (max-width: 1280px) {
     .ceo-layout {
         grid-template-columns: 1fr;
     }
     .ceo-card {
-        position: static; /* Reverts sticky positioning on stacked small screens */
+        position: static;
     }
     .ceo-others {
         max-height: 420px;
@@ -844,11 +885,17 @@
 
     .header-right {
         width: 100%;
-        justify-content: space-between;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .filter-toolbar {
+        flex-wrap: wrap;
+        width: 100%;
     }
 
     .pool-summary {
-        flex: 1;
+        width: 100%;
     }
 
     .deductions-container,

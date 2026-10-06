@@ -1,4 +1,14 @@
 public with sharing class LearningAccessAdminController {
+    @TestVisible private static Boolean canManageFilesOverride;
+
+    private static void assertCanManageFiles() {
+        Boolean canManageFiles = canManageFilesOverride != null
+            ? canManageFilesOverride
+            : FeatureManagement.checkPermission('Assign_Files');
+        if (!canManageFiles) {
+            throw new AuraHandledException('You do not have permission to manage learning file access.');
+        }
+    }
 
     public class FileOption implements Comparable {
         @AuraEnabled public Id fileId;
@@ -309,6 +319,88 @@ public with sharing class LearningAccessAdminController {
 
         if (!toInsert.isEmpty()) insert toInsert;
         if (!toUpdate.isEmpty()) update toUpdate;
+    }
+
+    @AuraEnabled
+    public static List<Map<String, Object>> getGrantedFilesForContact(Id contactId) {
+        assertCanManageFiles();
+        if (contactId == null) {
+            throw new AuraHandledException('A team member is required.');
+        }
+
+        List<Map<String, Object>> grantedFiles = new List<Map<String, Object>>();
+        for (Learning_Access__c accessRecord : [
+            SELECT Id, Learning_File__c, Learning_File__r.Name, Granted_Date__c,
+                   Completion_Status__c
+            FROM Learning_Access__c
+            WHERE Contact__c = :contactId AND Access_Status__c = 'Granted'
+            ORDER BY Learning_File__r.Name
+        ]) {
+            grantedFiles.add(new Map<String, Object>{
+                'accessId' => accessRecord.Id,
+                'fileId' => accessRecord.Learning_File__c,
+                'fileName' => accessRecord.Learning_File__r.Name,
+                'grantedDate' => accessRecord.Granted_Date__c,
+                'completionStatus' => accessRecord.Completion_Status__c
+            });
+        }
+        return grantedFiles;
+    }
+
+    @AuraEnabled
+    public static void revokeFileFromContact(Id contactId, Id fileId) {
+        assertCanManageFiles();
+        if (contactId == null || fileId == null) {
+            throw new AuraHandledException('A team member and file are required.');
+        }
+
+        List<Learning_Access__c> accessRecords = [
+            SELECT Id, Access_Status__c
+            FROM Learning_Access__c
+            WHERE Contact__c = :contactId
+              AND Learning_File__c = :fileId
+              AND Access_Status__c = 'Granted'
+            LIMIT 1
+        ];
+        if (accessRecords.isEmpty()) {
+            throw new AuraHandledException('This file is not currently granted to the selected team member.');
+        }
+
+        accessRecords[0].Access_Status__c = 'Revoked';
+        accessRecords[0].Revoked_Date__c = System.now();
+        update accessRecords[0];
+    }
+
+    @AuraEnabled
+    public static void revokeFilesFromContact(Id contactId, List<Id> fileIds) {
+        assertCanManageFiles();
+        if (contactId == null || fileIds == null || fileIds.isEmpty()) {
+            throw new AuraHandledException('A team member and at least one file are required.');
+        }
+
+        Set<Id> requestedFileIds = new Set<Id>(fileIds);
+        if (requestedFileIds.contains(null)) {
+            throw new AuraHandledException('The selected file list contains an invalid file.');
+        }
+
+        List<Learning_Access__c> accessRecords = [
+            SELECT Id, Learning_File__c
+            FROM Learning_Access__c
+            WHERE Contact__c = :contactId
+              AND Learning_File__c IN :requestedFileIds
+              AND Access_Status__c = 'Granted'
+            FOR UPDATE
+        ];
+        if (accessRecords.size() != requestedFileIds.size()) {
+            throw new AuraHandledException('One or more selected files are no longer granted to this team member. Refresh the list and try again.');
+        }
+
+        Datetime revokedAt = System.now();
+        for (Learning_Access__c accessRecord : accessRecords) {
+            accessRecord.Access_Status__c = 'Revoked';
+            accessRecord.Revoked_Date__c = revokedAt;
+        }
+        update accessRecords;
     }
 
     private static String buildAccessName(String fileName, String contactName) {

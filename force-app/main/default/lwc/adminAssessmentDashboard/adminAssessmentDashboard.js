@@ -1,4 +1,5 @@
 import { LightningElement, track, wire } from 'lwc';
+import { refreshApex } from '@salesforce/apex';
 import getExperienceUsers from '@salesforce/apex/AdminDashboardController.getExperienceUsers';
 import getCategories from '@salesforce/apex/AdminDashboardController.getCategories';
 import getAdminAssignmentsForCategory from '@salesforce/apex/AdminDashboardController.getAdminAssignmentsForCategory';
@@ -48,10 +49,14 @@ export default class AdminAssessmentDashboard extends LightningElement {
     showAttendanceScreen = false;
     showAssignAssignmentsModal = false;
 
+    // Edit User Modal
+    showEditUserModal = false;
+
     showCreateUserModal = false;
     isRefreshingAppeals = false;
     appealsRefreshQueued = false;
     appealsRefreshRequestId = 0;
+    wiredUsersResult;
 
     get showCreateUserLink() { return canViewAttendance; }
     get hasNoPendingAppeals() {
@@ -65,6 +70,14 @@ export default class AdminAssessmentDashboard extends LightningElement {
     }
     get disableSelectedReviewActions() {
         return !this.hasSelectedAppeals || this.isReviewingAppeal;
+    }
+
+    // Unmounts search bar when modal is up to prevent quick-fill email injection into search
+    get isModalOpen() {
+        return this.showCreateUserModal || 
+               this.showEditUserModal || 
+               this.showAssignModal || 
+               this.showAssignAssignmentsModal;
     }
 
     handleOpenAppeals() {
@@ -192,24 +205,59 @@ export default class AdminAssessmentDashboard extends LightningElement {
         this.syncAppealSelection();
     }
 
+    // ── Create User Handling ──
     handleOpenCreateUser() {
+        this.searchTerm = '';
         this.showCreateUserModal = true;
     }
 
     handleCloseCreateUser() {
         this.showCreateUserModal = false;
+        this.searchTerm = '';
     }
 
-    async handleCreateUserSuccess() {
+    async handleCreateUserSuccess(event) {
+        if (event) {
+            event.stopPropagation();
+        }
         this.showCreateUserModal = false;
-        this.showToast('Success', 'User created.', 'success');
+        this.searchTerm = '';
+        this.showToast('Success', 'User created successfully.', 'success');
+
         if (this.wiredUsersResult) {
             try {
                 await refreshApex(this.wiredUsersResult);
+                setTimeout(async () => {
+                    await refreshApex(this.wiredUsersResult);
+                }, 1200);
             } catch (error) {
-                this.showToast('Refresh failed', 'User was created, but the roster could not be refreshed.', 'warning');
+                this.showToast('Notice', 'User created, roster refresh pending.', 'info');
             }
         }
+    }
+
+    // ── Edit Contact Handlers ──
+    handleOpenEditUser(event) {
+        event.stopPropagation();
+        this.selectedContactId = event.currentTarget.dataset.id;
+        this.selectedUserName = event.currentTarget.dataset.name;
+        this.showEditUserModal = true;
+    }
+
+    handleCloseEditUser() {
+        this.showEditUserModal = false;
+    }
+
+    async handleEditSuccess() {
+        this.showToast('Success', 'Contact updated successfully.', 'success');
+        this.showEditUserModal = false;
+        if (this.wiredUsersResult) {
+            await refreshApex(this.wiredUsersResult);
+        }
+    }
+
+    handleEditError(event) {
+        this.showToast('Error', event.detail?.message || 'Could not update contact record.', 'error');
     }
 
     get showAssignmentsLink() { return canViewAssignments; }
@@ -220,12 +268,20 @@ export default class AdminAssessmentDashboard extends LightningElement {
     wiredUsers(result) {
         this.wiredUsersResult = result;
         const { error, data } = result;
-        if (data) this.users = data;
-        else if (error) this.showToast('Error', 'Failed to retrieve active roster profiles.', 'error');
+        if (data) {
+            this.users = data.map(u => ({
+                ...u,
+                hasEmail: Boolean(u.Email && u.Email.trim().length > 0),
+                hasPhone: Boolean(u.Phone && u.Phone.trim().length > 0),
+                PhoneDisplay: u.Phone ? u.Phone.trim() : '',
+                EmailDisplay: u.Email ? u.Email.trim() : '',
+                AccountName: u.Account?.Name || 'CloudNextGen IT Software Solutions LLP'
+            }));
+        } else if (error) {
+            this.showToast('Error', 'Failed to retrieve active roster profiles.', 'error');
+        }
     }
 
-    // getCategories() doesn't depend on contactId/any per-user state, so it's
-    // wired once at load instead of being re-fetched imperatively on every click.
     @wire(getCategories)
     wiredCategories({ error, data }) {
         if (data) this.categories = data;
@@ -246,7 +302,7 @@ export default class AdminAssessmentDashboard extends LightningElement {
     }
 
     handleOpenAssign(event) {
-        event.stopPropagation(); // prevents handleUserClick from also firing
+        event.stopPropagation();
         this.selectedContactId = event.currentTarget.dataset.contactId;
         this.selectedUserName = event.currentTarget.dataset.name;
         this.showAssignModal = true;
@@ -336,7 +392,6 @@ export default class AdminAssessmentDashboard extends LightningElement {
             .finally(() => { this.isLoading = false; });
     }
 
-    // Navigations back
     navBackToUsers() {
         this.showCategoryScreen = false;
         this.showUserScreen = true;

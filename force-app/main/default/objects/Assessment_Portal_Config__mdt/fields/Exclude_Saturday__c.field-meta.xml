@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Exclude_Saturday__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>When enabled, Saturday attendance does not count as late and cannot trigger a lateness deduction.</description>
+    <fieldManageability>DeveloperControlled</fieldManageability>
+    <label>Exclude Saturday</label>
+    <type>Checkbox</type>
+</CustomField>

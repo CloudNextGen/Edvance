@@ -2,14 +2,6 @@
     <template if:true={hasAnyInstructions}>
         <div class="instruction-card">
 
-            <!-- Unified Card Header -->
-            <div class="card-header slds-p-horizontal_medium slds-p-vertical_small">
-                <div class="header-inner">
-                    <lightning-icon icon-name="custom:custom19" size="small" class="header-icon"></lightning-icon>
-                    <span class="header-title">Guidelines &amp; Instructions</span>
-                </div>
-            </div>
-
             <!-- Spinner -->
             <template if:true={isLoading}>
                 <div class="slds-p-around_large slds-align_absolute-center">

@@ -8,23 +8,6 @@
  */
 public with sharing class AttendanceAdminController {
 
-    // ---------- Pending appeals (per employee) ----------
-
-    @AuraEnabled(cacheable=true)
-    public static List<Attendance_Log__c> getPendingAppealsForDashboard() {
-        if (!FeatureManagement.checkPermission('View_Attendance')) {
-            throw new AuraHandledException('You do not have permission to view attendance appeals.');
-        }
-        return [
-            SELECT Id, Employee__c, Employee__r.Name, Type__c, Event_Timestamp__c,
-                   Late_Minutes__c, Status__c, Excusal_Reason__c, Deduction_Amount__c,
-                   Attendance_Summary__r.Date__c
-            FROM Attendance_Log__c
-            WHERE Status__c = 'Pending' AND Appeal_Submitted__c = true
-            ORDER BY Event_Timestamp__c ASC
-            LIMIT 2000
-        ];
-    }
 
     @AuraEnabled
     public static Integer reviewSelectedAppeals(List<Id> logIds, Boolean approve) {
@@ -71,6 +54,11 @@ public with sharing class AttendanceAdminController {
         }
         query += 'ORDER BY Event_Timestamp__c ASC LIMIT 200';
         return Database.query(query);
+    }
+
+    @AuraEnabled
+    public static List<Attendance_Log__c> getPendingAppealsForDashboard() {
+        return getPendingLateInstances(null);
     }
 
     @AuraEnabled

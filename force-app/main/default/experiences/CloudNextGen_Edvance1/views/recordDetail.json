@@ -10,29 +10,9 @@
     "type" : "region"
   }, {
     "components" : [ {
-      "componentAttributes" : {
-        "recordId" : "{!recordId}"
-      },
-      "componentName" : "forceCommunity:recordHeadline",
-      "id" : "ce4889aa-040d-429f-8832-ed5514f5d363",
-      "renderPriority" : "NEUTRAL",
-      "renditionMap" : { },
-      "type" : "component"
-    }, {
-      "componentAttributes" : {
-        "detailsTabLabel" : "Details",
-        "discussionsTabLabel" : "Feed",
-        "recordId" : "{!recordId}",
-        "relatedTabLabel" : "Related",
-        "showLegacyActivityComposer" : false,
-        "tab1Type" : "details",
-        "tab2Type" : "related",
-        "tab3Type" : "chatter",
-        "tab4Type" : "none",
-        "timelineTabLabel" : "Activity"
-      },
-      "componentName" : "forceCommunity:recordHomeTabs",
-      "id" : "908fc032-ea5c-46cf-ad77-32309f389cac",
+      "componentAttributes" : { },
+      "componentName" : "c:notificationRecordRouter",
+      "id" : "c51ad669-8459-42d7-bb23-b944ce225d5f",
       "renderPriority" : "NEUTRAL",
       "renditionMap" : { },
       "type" : "component"

@@ -195,6 +195,21 @@
     margin-bottom: 1.5rem;
 }
 
+.lc-access-warning {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    background: #FFF8E1;
+    border: 1px solid #F2D58A;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    color: #805B12;
+    font-size: 0.9rem;
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
 .lc-empty {
     background: var(--white);
     border: 1px dashed var(--line);
@@ -535,15 +550,69 @@
 }
 
 .path-warning-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     margin-top: 1.75rem;
     background: #FFF8C8;
     border: 1px solid #F2C94C;
     border-radius: 14px;
     padding: 1.25rem 1.5rem;
-    text-align: center;
     color: #8A6D1F;
     font-weight: 700;
     font-size: 0.95rem;
+}
+
+.access-request-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-top: 0.85rem;
+    text-align: center;
+}
+
+.btn-request-access {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    border: 1px solid var(--violet);
+    border-radius: 10px;
+    padding: 0.7rem 1.15rem;
+    background: linear-gradient(135deg, var(--violet), #6556C7);
+    color: #fff;
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 750;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(90, 74, 190, 0.2);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.btn-request-access:hover:not(:disabled) {
+    background: linear-gradient(135deg, #6D60D0, #5748B9);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(90, 74, 190, 0.28);
+}
+
+.btn-request-access:focus-visible {
+    outline: 3px solid rgba(124, 111, 212, 0.35);
+    outline-offset: 2px;
+}
+
+.btn-request-access:disabled {
+    cursor: default;
+    background: #EEF0F6;
+    border-color: #D8DCE7;
+    color: #626A7C;
+    box-shadow: none;
+}
+
+.access-request-caption {
+    color: var(--ink-soft);
+    font-size: 0.85rem;
 }
 
 /* ── How it works strip ─────────────────────────────────────── */

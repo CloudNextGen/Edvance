@@ -54,7 +54,8 @@ public with sharing class PortalHomeController {
                 );
             }
         } catch (Exception e) {
-            System.debug(LoggingLevel.ERROR, 'PortalHomeController.getProfileDetails failed: ' + e.getMessage());
+            ErrorLogger.log(e);
+            throw new AuraHandledException('Unable to load profile details.');
         }
 
         return result;

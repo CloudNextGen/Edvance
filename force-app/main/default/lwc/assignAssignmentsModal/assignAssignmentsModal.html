@@ -77,6 +77,19 @@
                                                             onclick={handleReassign}>
                                                         </lightning-button>
                                                     </template>
+                                                    <template if:true={asm.canRevoke}>
+                                                        <lightning-button
+                                                            label="Revoke"
+                                                            title="Revoke assignment access"
+                                                            variant="destructive-text"
+                                                            icon-name="utility:lock"
+                                                            class="slds-m-left_x-small"
+                                                            data-eligibility-id={asm.eligibilityId}
+                                                            data-name={asm.assignmentName}
+                                                            onclick={handleRevoke}
+                                                            disabled={isLoading}>
+                                                        </lightning-button>
+                                                    </template>
                                                 </div>
 
                                             </div>

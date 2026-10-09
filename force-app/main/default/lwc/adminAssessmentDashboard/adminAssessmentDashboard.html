@@ -14,11 +14,15 @@
             <div class="screen">    
                 <div class="screen-header screen-header-with-action">
                     <div class="screen-header-text">
-                        <span class="eyebrow">Admin Console</span>
-                        <h1 class="screen-title">Experience Portal Users</h1>
-                        <p class="screen-subtitle">Select an external student or contact to audit their assignments and transcripts.</p>
+                        <h1 class="screen-title">Experience Portal User</h1>
+                        <p class="screen-subtitle">{dashboardSubtitle}</p>
                     </div>
                     <div class="dashboard-header-actions">
+                        <template if:true={showManagePortalUsersButton}>
+                            <button type="button" class="btn-view-appeals" onclick={handleOpenUserStatusModal}>
+                                Activate / Deactivate
+                            </button>
+                        </template>
                         <template if:true={showCreateUserLink}>
                             <button type="button" class="btn-view-appeals" onclick={handleOpenAppeals}>
                                 View Appeals
@@ -157,15 +161,15 @@
                                                     </button>
                                                 </template>
 
-                                                <template if:true={showAssignmentsLink}>
+                                                <template if:true={showAttendanceLink}>
                                                     <button type="button"
-                                                        class="admin-action-btn btn-tone-assignments"
-                                                        data-id={u.Id}
+                                                        class="admin-action-btn btn-tone-attendance"
+                                                        data-contact-id={u.Id}
                                                         data-name={u.Name}
-                                                        onclick={handleUserClick}
-                                                        title="View Assignments">
-                                                        <lightning-icon icon-name="utility:list" size="xx-small"></lightning-icon>
-                                                        <span>Audits</span>
+                                                        onclick={handleOpenAttendance}
+                                                        title="View Attendance">
+                                                        <lightning-icon icon-name="utility:event" size="xx-small"></lightning-icon>
+                                                        <span>Attendance</span>
                                                     </button>
                                                 </template>
 
@@ -189,21 +193,22 @@
                                                         onclick={handleOpenAssignAssignments}
                                                         title="Assign Tests">
                                                         <lightning-icon icon-name="utility:note" size="xx-small"></lightning-icon>
-                                                        <span>Assign</span>
+                                                        <span>Assignment</span>
                                                     </button>
                                                 </template>
 
-                                                <template if:true={showAttendanceLink}>
+                                                <template if:true={showAssignmentsLink}>
                                                     <button type="button"
-                                                        class="admin-action-btn btn-tone-attendance"
-                                                        data-contact-id={u.Id}
+                                                        class="admin-action-btn btn-tone-assignments"
+                                                        data-id={u.Id}
                                                         data-name={u.Name}
-                                                        onclick={handleOpenAttendance}
-                                                        title="View Attendance">
-                                                        <lightning-icon icon-name="utility:event" size="xx-small"></lightning-icon>
-                                                        <span>Attendance</span>
+                                                        onclick={handleUserClick}
+                                                        title="View Results">
+                                                        <lightning-icon icon-name="utility:list" size="xx-small"></lightning-icon>
+                                                        <span>Result</span>
                                                     </button>
                                                 </template>
+
                                             </div>
                                         </div>
                                     </td>
@@ -292,12 +297,99 @@
                 <!-- CREATE USER MODAL -->
                 <template if:true={showCreateUserModal}>
                     <div class="ccu-modal-overlay">
-                        <div class="ccu-modal-panel">
+                        <div class="ccu-modal-panel create-user-panel">
                             <button class="ccu-modal-close" onclick={handleCloseCreateUser} title="Close">
                                 <lightning-icon icon-name="utility:close" size="x-small"></lightning-icon>
                             </button>
                             <c-creating-community-user onusercreated={handleCreateUserSuccess}></c-creating-community-user>
                         </div>
+                    </div>
+                </template>
+
+                <!-- ACTIVATE / DEACTIVATE PORTAL USER MODAL -->
+                <template if:true={showUserStatusModal}>
+                    <div class="ccu-modal-overlay">
+                        <section class="ccu-modal-panel user-status-panel" role="dialog" aria-modal="true" aria-labelledby="user-status-title">
+                            <button class="ccu-modal-close" onclick={handleCloseUserStatusModal} title="Close">
+                                <lightning-icon icon-name="utility:close" size="x-small"></lightning-icon>
+                            </button>
+                            <span class="eyebrow">User Management</span>
+                            <h2 id="user-status-title" class="edit-modal-title">Activate / Deactivate Users</h2>
+                            <p class="edit-modal-subtitle">Choose which users to manage.</p>
+
+                            <template if:false={userStatusMode}>
+                                <div class="user-status-mode-options">
+                                    <button type="button" class="user-status-mode-card" onclick={handleSelectActivateMode}>
+                                        <lightning-icon icon-name="utility:unlock" size="small"></lightning-icon>
+                                        <span>Activate old user</span>
+                                        <small>Find a deactivated portal user and restore access.</small>
+                                    </button>
+                                    <button type="button" class="user-status-mode-card" onclick={handleSelectDeactivateMode}>
+                                        <lightning-icon icon-name="utility:lock" size="small"></lightning-icon>
+                                        <span>Deactivate current user</span>
+                                        <small>Find an active portal user and remove access.</small>
+                                    </button>
+                                </div>
+                            </template>
+
+                            <template if:true={userStatusMode}>
+                                <button type="button" class="user-status-back" onclick={handleBackToUserStatusActions}>
+                                    <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
+                                    Change action
+                                </button>
+                                <h3 class="user-status-list-title">{userStatusTitle}</h3>
+                                <div class="user-status-search">
+                                    <lightning-icon icon-name="utility:search" size="x-small"></lightning-icon>
+                                    <input
+                                        type="search"
+                                        placeholder={userStatusSearchPlaceholder}
+                                        value={userStatusSearch}
+                                        oninput={handleUserStatusSearch}
+                                        autocomplete="off" />
+                                </div>
+                                <p class="user-status-count">{userStatusCountLabel}</p>
+
+                                <div class="user-status-list" onscroll={handleUserStatusListScroll}>
+                                    <template if:true={hasUserStatusRows}>
+                                        <template for:each={userStatusRows} for:item="user">
+                                            <div class="user-status-row" key={user.id}>
+                                                <div class="user-status-identity">
+                                                    <strong>{user.name}</strong>
+                                                    <span>{user.email}</span>
+                                                    <template if:true={user.accountName}>
+                                                        <small>{user.accountName}</small>
+                                                    </template>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    class={user.actionClass}
+                                                    data-user-id={user.id}
+                                                    data-user-name={user.name}
+                                                    onclick={handleChooseUserStatusChange}
+                                                    disabled={isUserStatusActionPending}>
+                                                    {userStatusActionLabel}
+                                                </button>
+                                            </div>
+                                        </template>
+                                    </template>
+                                    <template if:true={showUserStatusEmpty}>
+                                        <p class="user-status-empty">No matching users found.</p>
+                                    </template>
+                                    <template if:true={hasUserStatusError}>
+                                        <div class="user-status-error">
+                                            <span>{userStatusError}</span>
+                                            <button type="button" onclick={loadUserStatusRows}>Try again</button>
+                                        </div>
+                                    </template>
+                                    <template if:true={showUserStatusSpinner}>
+                                        <div class="user-status-spinner">
+                                            <lightning-spinner alternative-text="Loading users" size="small"></lightning-spinner>
+                                        </div>
+                                    </template>
+                                </div>
+
+                            </template>
+                        </section>
                     </div>
                 </template>
             </div>
@@ -326,13 +418,38 @@
                         <p class="screen-subtitle">Select a team member's name to review their appeal details.</p>
                     </div>
                     <div class="dashboard-header-actions">
-                        <lightning-button
-                            label="Refresh"
-                            title="Refresh pending appeals"
-                            icon-name="utility:refresh"
-                            onclick={handleRefreshAppeals}
-                            disabled={isRefreshingAppeals}>
-                        </lightning-button>
+                        <template if:true={showAppealDetail}>
+                            <lightning-button-group>
+                            <lightning-button
+                                label="Approve"
+                                title="Approve this appeal"
+                                onclick={handleApproveSelected}
+                                disabled={disableAppealDetailReviewActions}>
+                            </lightning-button>
+                            <lightning-button
+                                label="Reject"
+                                title="Reject this appeal"
+                                onclick={handleRejectSelected}
+                                disabled={disableAppealDetailReviewActions}>
+                            </lightning-button>
+                            <lightning-button
+                                label="Refresh"
+                                title="Refresh pending appeals"
+                                icon-name="utility:refresh"
+                                onclick={handleRefreshAppeals}
+                                disabled={isRefreshingAppeals}>
+                            </lightning-button>
+                            </lightning-button-group>
+                        </template>
+                        <template if:false={showAppealDetail}>
+                            <lightning-button
+                                label="Refresh"
+                                title="Refresh pending appeals"
+                                icon-name="utility:refresh"
+                                onclick={handleRefreshAppeals}
+                                disabled={isRefreshingAppeals}>
+                            </lightning-button>
+                        </template>
                     </div>
                 </div>
 
@@ -418,7 +535,7 @@
         <!-- CATEGORY SCREEN -->
         <template if:true={showCategoryScreen}>
             <div class="screen">
-                <button class="back-link" onclick={navBackToUsers}>
+                <button class="back-link" onclick={navigateBackToUsers}>
                     <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
                     <span>All Users</span>
                 </button>
@@ -450,7 +567,7 @@
         <!-- ASSIGNMENT SCREEN -->
         <template if:true={showAssignmentScreen}>
             <div class="screen">
-                <button class="back-link" onclick={navBackToCategories}>
+                <button class="back-link" onclick={navigateBackToCategories}>
                     <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
                     <span>All categories</span>
                 </button>
@@ -461,28 +578,28 @@
                 </div>
 
                 <div class="assignment-list">
-                    <template for:each={assignments} for:item="asm">
-                        <div key={asm.Id} class={asm.rowClass}>
+                    <template for:each={assignments} for:item="assignment">
+                        <div key={assignment.Id} class={assignment.rowClass}>
                             <div class="assignment-row-info">
-                                <p class="assignment-row-name">{asm.Name}</p>
+                                <p class="assignment-row-name">{assignment.Name}</p>
                                 <p class="assignment-row-meta">
                                     <lightning-icon icon-name="utility:rows" size="xx-small"></lightning-icon>
-                                    <span>{asm.Total_Question_Count__c} questions</span>
+                                    <span>{assignment.Total_Question_Count__c} questions</span>
                                 </p>
                             </div>
 
-                            <template if:true={asm.isEligibleStatus}>
+                            <template if:true={assignment.isEligibleStatus}>
                                 <button class="btn-start" disabled>Eligible</button>
                             </template>
-                            <template if:true={asm.isCompletedStatus}>
+                            <template if:true={assignment.isCompletedStatus}>
                                 <button class="btn-start btn-completed"
-                                        data-id={asm.Id}
-                                        data-title={asm.Name}
+                                        data-id={assignment.Id}
+                                        data-title={assignment.Name}
                                         onclick={handleViewAttempts}>
                                     View attempts →
                                 </button>
                             </template>
-                            <template if:true={asm.isLockedStatus}>
+                            <template if:true={assignment.isLockedStatus}>
                                 <button class="btn-start" disabled>Locked</button>
                             </template>
                         </div>
@@ -494,7 +611,7 @@
         <!-- ATTEMPTS SCREEN -->
         <template if:true={showAttemptsScreen}>
             <div class="screen">
-                <button class="back-link" onclick={navBackToAssignments}>
+                <button class="back-link" onclick={navigateBackToAssignments}>
                     <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
                     <span>Back</span>
                 </button>
@@ -547,7 +664,7 @@
         <!-- REVIEW SCREEN -->
         <template if:true={showReviewScreen}>
             <div class="screen">
-                <button class="back-link" onclick={navBackToAttempts}>
+                <button class="back-link" onclick={navigateBackToAttempts}>
                     <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
                     <span>All attempts</span>
                 </button>

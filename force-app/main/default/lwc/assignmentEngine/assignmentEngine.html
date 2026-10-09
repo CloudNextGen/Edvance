@@ -44,6 +44,13 @@
                     </div>
                 </div>
 
+                <template if:true={categoryAccessWarning}>
+                    <div class="category-access-warning" role="status">
+                        <lightning-icon icon-name="utility:warning" size="x-small" alternative-text="Access restricted"></lightning-icon>
+                        <span>{categoryAccessWarning}</span>
+                    </div>
+                </template>
+
                 <template if:true={isEmpty}>
                     <div class="ac-empty">
                         <p>No assignment is assigned to you, Please check back later.</p>
@@ -134,7 +141,7 @@
         <template if:true={showAssignmentScreen}>
             <div class="screen">
                 <div class="topbar">
-                    <button class="btn-back" onclick={navBackToCategories}>
+                    <button class="btn-back" onclick={navigateBackToCategories}>
                         <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
                         <span>All categories</span>
                     </button>
@@ -173,61 +180,83 @@
                 </div>
 
                 <div class="asm-list">
-                    <template for:each={paginatedAssignments} for:item="asm">
-                        <template if:true={asm.isEligibleStatus}>
-                            <div key={asm.Id} class="asm-row">
+                    <template for:each={paginatedAssignments} for:item="assignment">
+                        <template if:true={assignment.isEligibleStatus}>
+                            <div key={assignment.Id} class="asm-row">
                                 <div class="asm-icon-wrap asm-icon-eligible">
                                     <lightning-icon icon-name="standard:document" size="small"></lightning-icon>
                                 </div>
                                 <div class="asm-info">
-                                    <p class="asm-name">{asm.Name}</p>
+                                    <p class="asm-name">{assignment.Name}</p>
                                     <p class="asm-meta">
                                         <lightning-icon icon-name="utility:rows" size="xx-small"></lightning-icon>
-                                        <span>{asm.Total_Question_Count__c} questions</span>
+                                        <span>{assignment.Total_Question_Count__c} questions</span>
                                     </p>
                                 </div>
                                 <button
                                     class="btn-asm btn-asm-start"
-                                    data-id={asm.Id}
-                                    data-title={asm.Name}
+                                    data-id={assignment.Id}
+                                    data-title={assignment.Name}
                                     onclick={handleAssignmentClick}>
                                     Start →
                                 </button>
                             </div>
                         </template>
 
-                        <template if:true={asm.isCompletedStatus}>
-                            <div key={asm.Id} class="asm-row asm-row-completed">
+                        <template if:true={assignment.isCompletedStatus}>
+                            <div key={assignment.Id} class="asm-row asm-row-completed">
                                 <div class="asm-icon-wrap asm-icon-completed">
                                     <lightning-icon icon-name="utility:check" size="small"></lightning-icon>
                                 </div>
                                 <div class="asm-info">
-                                    <p class="asm-name">{asm.Name}</p>
+                                    <p class="asm-name">{assignment.Name}</p>
                                     <p class="asm-meta">
                                         <lightning-icon icon-name="utility:rows" size="xx-small"></lightning-icon>
-                                        <span>{asm.Total_Question_Count__c} questions</span>
+                                        <span>{assignment.Total_Question_Count__c} questions</span>
                                     </p>
                                 </div>
                                 <button
                                     class="btn-asm btn-asm-completed"
-                                    data-id={asm.Id}
-                                    data-title={asm.Name}
+                                    data-id={assignment.Id}
+                                    data-title={assignment.Name}
                                     onclick={handleViewAttempts}>
                                     View results →
                                 </button>
                             </div>
                         </template>
 
-                        <template if:true={asm.isLockedStatus}>
-                            <div key={asm.Id} class="asm-row asm-row-locked">
+                        <template if:true={assignment.isRequestAccessStatus}>
+                            <div key={assignment.Id} class="asm-row">
                                 <div class="asm-icon-wrap asm-icon-locked">
                                     <lightning-icon icon-name="utility:lock" size="small"></lightning-icon>
                                 </div>
                                 <div class="asm-info">
-                                    <p class="asm-name">{asm.Name}</p>
+                                    <p class="asm-name">{assignment.Name}</p>
                                     <p class="asm-meta">
                                         <lightning-icon icon-name="utility:rows" size="xx-small"></lightning-icon>
-                                        <span>{asm.Total_Question_Count__c} questions</span>
+                                        <span>{assignment.Total_Question_Count__c} questions</span>
+                                    </p>
+                                </div>
+                                <button
+                                    class="btn-asm btn-asm-start"
+                                    data-id={assignment.Id}
+                                    onclick={handleRequestAssignmentAccess}
+                                    disabled={assignment.accessRequestButtonDisabled}>
+                                    {assignment.accessRequestButtonLabel}
+                                </button>
+                            </div>
+                        </template>
+
+                        <template if:true={assignment.isLockedStatus}>
+                            <div key={assignment.Id} class="asm-row asm-row-locked">
+                                <div class="asm-icon-wrap asm-icon-locked">
+                                    <lightning-icon icon-name="utility:lock" size="small"></lightning-icon>
+                                </div>
+                                <div class="asm-info">
+                                    <p class="asm-name">{assignment.Name}</p>
+                                    <p class="asm-meta">
+                                        <lightning-icon icon-name="utility:rows" size="xx-small"></lightning-icon>
+                                        <span>{assignment.Total_Question_Count__c} questions</span>
                                     </p>
                                 </div>
                                 <button class="btn-asm btn-asm-locked" disabled>
@@ -243,7 +272,7 @@
         <template if:true={showAttemptsScreen}>
             <div class="screen">
                 <div class="topbar">
-                    <button class="btn-back" onclick={navBackToAssignments}>
+                    <button class="btn-back" onclick={navigateBackToAssignments}>
                         <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
                         <span>Back</span>
                     </button>
@@ -303,7 +332,7 @@
         <template if:true={showReviewScreen}>
             <div class="screen">
                 <div class="topbar">
-                    <button class="btn-back" onclick={navBackToAttempts}>
+                    <button class="btn-back" onclick={navigateBackToAttempts}>
                         <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
                         <span>All attempts</span>
                     </button>
@@ -336,7 +365,7 @@
         <template if:true={showInstructionsScreen}>
             <div class="screen">
                 <div class="topbar">
-                    <button class="btn-back" onclick={navBackFromInstructions}>
+                    <button class="btn-back" onclick={navigateBackFromInstructions}>
                         <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
                         <span>Back</span>
                     </button>

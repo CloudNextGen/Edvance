@@ -13,11 +13,29 @@
                     <h2 class="heading">My Requests</h2>
                 </div>
                 <div class="header-actions">
-                    <button class="secondary-btn refresh-btn" onclick={handleRefresh} disabled={isRefreshing}>
-                        <template if:false={isRefreshing}>↻ Refresh</template>
-                        <template if:true={isRefreshing}>Refreshing...</template>
+                    <button class="secondary-btn refresh-btn" onclick={handleRefresh} disabled={isRefreshing}
+                        aria-label="Refresh requests" title="Refresh requests">
+                        <template if:true={isRefreshing}>
+                            <span class="refresh-spinner" aria-hidden="true"></span>
+                        </template>
+                        <template if:false={isRefreshing}>
+                            <span class="refresh-icon" aria-hidden="true">↻</span>
+                        </template>
                     </button>
-                    <button class="primary-btn" onclick={handleOpenModal}>+ New Request</button>
+                    <div class="stats-wrap" role="group" aria-label="Filter requests by status">
+                        <button class={allFilterClass} onclick={handleFilterChange} data-filter="ALL">
+                            All ({totalCount})
+                        </button>
+                        <button class={openFilterClass} onclick={handleFilterChange} data-filter="New">
+                            {openCount} Open
+                        </button>
+                        <button class={progressFilterClass} onclick={handleFilterChange} data-filter="Working">
+                            {progressCount} In Progress
+                        </button>
+                        <button class={completedFilterClass} onclick={handleFilterChange} data-filter="Closed">
+                            {completedCount} Completed
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -54,8 +72,14 @@
             </template>
 
             <template if:true={noRequests}>
-                <p class="empty-text">You haven't raised any requests yet.</p>
+                <p class="empty-text">{noRequestsMessage}</p>
             </template>
+
+            <div class="new-request-actions">
+                <button class="primary-btn" onclick={handleOpenModal}>
+                    <span aria-hidden="true">+</span> New Request
+                </button>
+            </div>
         </template>
 
         <template if:true={isModalOpen}>

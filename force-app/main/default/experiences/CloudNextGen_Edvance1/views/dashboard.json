@@ -26,7 +26,9 @@
       "id" : "1b8079cb-e24f-479f-b702-6ab85e3cd0fb",
       "regions" : [ {
         "components" : [ {
-          "componentAttributes" : { },
+          "componentAttributes" : {
+            "dashboardSubtitle" : "Select a team member to view assignments and results."
+          },
           "componentName" : "c:adminAssessmentDashboard",
           "id" : "908b6037-00e0-409b-adbc-2058d0164c8f",
           "renderPriority" : "NEUTRAL",

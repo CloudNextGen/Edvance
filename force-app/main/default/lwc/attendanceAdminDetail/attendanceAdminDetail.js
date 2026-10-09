@@ -1,9 +1,11 @@
-import { LightningElement, api, track } from 'lwc';
+import { LightningElement, api, track, wire } from 'lwc';
 import getPendingLateInstances from '@salesforce/apex/AttendanceAdminController.getPendingLateInstances';
 import reviewLateInstance from '@salesforce/apex/AttendanceAdminController.reviewLateInstance';
 import getHistory from '@salesforce/apex/AttendanceAdminController.getHistory';
 import getDayDetail from '@salesforce/apex/AttendanceAdminController.getDayDetail';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import { MessageContext, publish } from 'lightning/messageService';
+import ATTENDANCE_DEDUCTION_REFRESH from '@salesforce/messageChannel/Attendance_Deduction_Refresh__c';
 
 export default class AttendanceAdminDetail extends LightningElement {
     @api contactId;
@@ -12,9 +14,12 @@ export default class AttendanceAdminDetail extends LightningElement {
     @track pendingList = [];
     @track historyRows = [];
     @track dayEvents = [];
+    @wire(MessageContext) messageContext;
 
     // KPI Summary Metrics
     @track totalLateCount = 0;
+    @track officeLateCount = 0;
+    @track lunchLateCount = 0;
     @track totalDeductionAmount = 0;
 
     isLoadingAppeals = true;
@@ -99,10 +104,13 @@ export default class AttendanceAdminDetail extends LightningElement {
                 this.historyTotalCount = result.totalCount;
                 this.historyRows = result.records.map((row) => this.mapHistoryRow(row));
                 
-                this.totalLateCount = result.records.filter(row => 
-                    (row.Office_Late_Minutes__c && row.Office_Late_Minutes__c > 0) || 
-                    (row.Lunch_Late_Minutes__c && row.Lunch_Late_Minutes__c > 0)
+                this.officeLateCount = result.records.filter(
+                    (row) => Number(row.Office_Late_Minutes__c || 0) > 0
                 ).length;
+                this.lunchLateCount = result.records.filter(
+                    (row) => Number(row.Lunch_Late_Minutes__c || 0) > 0
+                ).length;
+                this.totalLateCount = this.officeLateCount + this.lunchLateCount;
 
                 this.totalDeductionAmount = result.records.reduce((sum, row) => sum + (row.Total_Deduction_Amount__c || 0), 0);
             })
@@ -151,12 +159,19 @@ export default class AttendanceAdminDetail extends LightningElement {
     }
 
     mapHistoryRow(row) {
-        const statuses = (row.Attendance_Logs__r || []).map((l) => l.Status__c);
+        const lateLogs = row.Attendance_Logs__r || [];
+        const statuses = lateLogs.map((l) => l.Status__c);
+        const deductionApplied = lateLogs.some((l) => Number(l.Deduction_Amount__c || 0) > 0);
         let statusLabel = 'On time';
         let statusClass = 'status-chip status-ontime';
         if (statuses.includes('Not Excused')) {
-            statusLabel = 'Deduction applied';
-            statusClass = 'status-chip status-deducted';
+            if (deductionApplied) {
+                statusLabel = 'Deduction applied';
+                statusClass = 'status-chip status-deducted';
+            } else {
+                statusLabel = 'Late — no deduction';
+                statusClass = 'status-chip status-ontime';
+            }
         } else if (statuses.includes('Excused')) {
             statusLabel = 'Excused';
             statusClass = 'status-chip status-excused';
@@ -208,7 +223,7 @@ export default class AttendanceAdminDetail extends LightningElement {
             return;
         }
 
-        const headers = ['Date', 'Office In', 'Office Out', 'Lunch Out', 'Lunch In', 'Office Late', 'Lunch Late', 'Deduction', 'Status'];
+        const headers = ['Date', 'Office In', 'Office Out', 'Lunch In', 'Lunch Out', 'Office Late', 'Lunch Late', 'Deduction', 'Status'];
         const csvRows = [headers.join(',')];
 
         this.historyRows.forEach(row => {
@@ -216,8 +231,8 @@ export default class AttendanceAdminDetail extends LightningElement {
                 `"${row.dateLabel || ''}"`,
                 `"${row.officeIn || ''}"`,
                 `"${row.officeOut || ''}"`,
-                `"${row.lunchOut || ''}"`,
                 `"${row.lunchIn || ''}"`,
+                `"${row.lunchOut || ''}"`,
                 `"${row.officeLateMinutes || ''}"`,
                 `"${row.lunchLateMinutes || ''}"`,
                 `"${row.deduction || 0}"`,
@@ -244,6 +259,9 @@ export default class AttendanceAdminDetail extends LightningElement {
 
         try {
             await reviewLateInstance({ logId, approve });
+            publish(this.messageContext, ATTENDANCE_DEDUCTION_REFRESH, {
+                action: 'appealReviewed'
+            });
             this.showToast('Success', approve ? 'Appeal approved.' : 'Appeal rejected.', 'success');
             this.loadHistory();
             if (this.view === 'dayDetail' && this.selectedSummaryId) {

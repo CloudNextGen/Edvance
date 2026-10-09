@@ -20,13 +20,17 @@ const TYPE_ICONS = {
     'Office Check-Out': 'utility:logout'
 };
 
-function isoDate(d) {
-    return d.toISOString().slice(0, 10);
+const LOCATION_SAMPLE_DURATION_MS = 5000;
+const TARGET_LOCATION_ACCURACY_METERS = 10;
+
+function formatIsoDate(dateValue) {
+    return dateValue.toISOString().slice(0, 10);
 }
 
 export default class AttendanceCapture extends LightningElement {
     // ---- Today / capture / appeal state ----
     isCapturing = false;
+    isGettingLocation = false;
     errorMessage = '';
     resultMessage = '';
 
@@ -35,6 +39,10 @@ export default class AttendanceCapture extends LightningElement {
     isSubmittingAppeal = false;
 
     wiredRecordResult;
+    lunchCountdownIntervalId;
+    officeCheckInOpeningTimestamp = NaN;
+    lastOfficeOpeningRefreshAt;
+    clockNow = Date.now();
     capturedCoords = null;
     selectedPunchType = null;
 
@@ -52,6 +60,8 @@ export default class AttendanceCapture extends LightningElement {
 
     // KPI Summary Metrics for History
     totalLateCount = 0;
+    officeLateCount = 0;
+    lunchLateCount = 0;
     totalDeductionAmount = 0;
 
     showCameraModal = false;
@@ -64,12 +74,69 @@ export default class AttendanceCapture extends LightningElement {
     @wire(getTodayRecord)
     wiredRecord(result) {
         this.wiredRecordResult = result;
+        if (result.data) {
+            this.clockNow = Date.now();
+            this.syncLunchCountdown(result.data);
+        } else if (result.error) {
+            this.stopLunchCountdown();
+        }
     }
 
     disconnectedCallback() {
+        this.stopLunchCountdown();
         if (this.cameraStream) {
             this.cameraStream.getTracks().forEach((track) => track.stop());
             this.cameraStream = null;
+        }
+    }
+
+    syncLunchCountdown(record) {
+        const lunchStarted = record.entries?.some(
+            (entry) => entry.type === 'Lunch Check-In' && entry.completed
+        );
+        const lunchEnded = record.entries?.some(
+            (entry) => entry.type === 'Lunch Check-Out' && entry.completed
+        );
+        const officeEnded = record.entries?.some(
+            (entry) => entry.type === 'Office Check-Out' && entry.completed
+        );
+        const hasDuration = Number(record.lunchDurationMinutes) > 0;
+        const nextOfficeCheckInOpensAt = record.nextOfficeCheckInOpensAt
+            ? new Date(record.nextOfficeCheckInOpensAt).getTime()
+            : NaN;
+        this.officeCheckInOpeningTimestamp = nextOfficeCheckInOpensAt;
+        const officeCheckInWaiting = Number.isFinite(nextOfficeCheckInOpensAt) &&
+            nextOfficeCheckInOpensAt > this.clockNow;
+        const lunchCountdownRunning = lunchStarted && !lunchEnded && !officeEnded &&
+            hasDuration && this.lunchCountdownSeconds > 0;
+
+        if (lunchCountdownRunning || officeCheckInWaiting) {
+            if (!this.lunchCountdownIntervalId) {
+                this.lunchCountdownIntervalId = setInterval(() => {
+                    this.clockNow = Date.now();
+                    this.syncLunchCountdown(this.record);
+                    const currentOpeningTimestamp = this.officeCheckInOpeningTimestamp;
+                    if (Number.isFinite(currentOpeningTimestamp) &&
+                        this.clockNow >= currentOpeningTimestamp &&
+                        this.lastOfficeOpeningRefreshAt !== currentOpeningTimestamp) {
+                        this.lastOfficeOpeningRefreshAt = currentOpeningTimestamp;
+                        refreshApex(this.wiredRecordResult).catch((error) => {
+                            this.errorMessage = error?.body?.message ||
+                                error?.message ||
+                                'Could not refresh attendance at the next check-in opening time.';
+                        });
+                    }
+                }, 1000);
+            }
+        } else {
+            this.stopLunchCountdown();
+        }
+    }
+
+    stopLunchCountdown() {
+        if (this.lunchCountdownIntervalId) {
+            clearInterval(this.lunchCountdownIntervalId);
+            this.lunchCountdownIntervalId = null;
         }
     }
 
@@ -95,6 +162,12 @@ export default class AttendanceCapture extends LightningElement {
             const isAppealOpen = this.appealOpenForId === entry.id;
             const canAppeal = entry.completed && entry.status === 'Not Excused' && !entry.excusalReason;
             const appealSubmitted = entry.completed && entry.status === 'Pending' && !!entry.excusalReason;
+            const officeCheckInOpensAt = entry.officeCheckInOpensAt
+                ? new Date(entry.officeCheckInOpensAt).getTime()
+                : NaN;
+            const officeCheckInWaiting = entry.type === 'Office Check-In' &&
+                !entry.completed &&
+                Number.isFinite(officeCheckInOpensAt) && officeCheckInOpensAt > this.clockNow;
 
             return {
                 ...entry,
@@ -102,15 +175,56 @@ export default class AttendanceCapture extends LightningElement {
                 label: TYPE_LABELS[entry.type],
                 iconName: TYPE_ICONS[entry.type],
                 formattedTime: entry.completed ? this.formatTime(entry.eventTimestamp) : '—',
-                badgeText: this.badgeTextFor(entry, appealSubmitted),
+                showLunchCountdown: entry.type === 'Lunch Check-In' &&
+                    entry.completed &&
+                    this.hasActiveLunchCountdown &&
+                    this.lunchCountdownSeconds > 0,
+                lunchCountdownText: entry.type === 'Lunch Check-In'
+                    ? this.lunchCountdownText(entry.eventTimestamp)
+                    : '',
+                badgeText: officeCheckInWaiting
+                    ? `Opens at ${this.formatTime(entry.officeCheckInOpensAt)}`
+                    : this.badgeTextFor(entry, appealSubmitted),
                 badgeClass: this.badgeClassFor(entry, appealSubmitted),
                 rowClass: entry.completed ? 'punch-row punch-row_done' : 'punch-row punch-row_pending',
                 canAppeal,
                 appealSubmitted,
                 isAppealOpen,
-                disableButton: entry.completed || !entry.eligible || this.isCapturing
+                disableButton: entry.completed || !entry.eligible || officeCheckInWaiting || this.isCapturing
             };
         });
+    }
+
+    get hasActiveLunchCountdown() {
+        return this.lunchCountdownIntervalId !== null && this.lunchCountdownIntervalId !== undefined;
+    }
+
+    get lunchCountdownSeconds() {
+        const lunchStart = this.record?.entries?.find(
+            (entry) => entry.type === 'Lunch Check-In' && entry.completed
+        );
+        const lunchDurationMinutes = Number(this.record?.lunchDurationMinutes);
+        const startTimestamp = lunchStart?.eventTimestamp ? new Date(lunchStart.eventTimestamp).getTime() : NaN;
+        if (!Number.isFinite(startTimestamp) || !Number.isFinite(lunchDurationMinutes)) {
+            return 0;
+        }
+
+        const deadline = startTimestamp + lunchDurationMinutes * 60 * 1000;
+        return Math.max(0, Math.ceil((deadline - this.clockNow) / 1000));
+    }
+
+    lunchCountdownText(eventTimestamp) {
+        const startTimestamp = eventTimestamp ? new Date(eventTimestamp).getTime() : NaN;
+        const lunchDurationMinutes = Number(this.record?.lunchDurationMinutes);
+        if (!Number.isFinite(startTimestamp) || !Number.isFinite(lunchDurationMinutes)) {
+            return '';
+        }
+
+        const deadline = startTimestamp + lunchDurationMinutes * 60 * 1000;
+        const secondsRemaining = Math.max(0, Math.ceil((deadline - this.clockNow) / 1000));
+        const minutes = String(Math.floor(secondsRemaining / 60)).padStart(2, '0');
+        const seconds = String(secondsRemaining % 60).padStart(2, '0');
+        return `${minutes}:${seconds}`;
     }
 
     get todayRecordErrorMessage() {
@@ -137,8 +251,8 @@ export default class AttendanceCapture extends LightningElement {
                     video.srcObject = this.cameraStream;
                 }
             });
-        } catch (e) {
-            this.cameraErrorMessage = this.cameraErrorMessageFor(e);
+        } catch (error) {
+            this.cameraErrorMessage = this.cameraErrorMessageFor(error);
             this.isCapturing = false;
         }
     }
@@ -249,12 +363,25 @@ export default class AttendanceCapture extends LightningElement {
     showPunchModal = false;
 
     get nextPunchEntry() {
-        return this.displayEntries.find((e) => !e.disableButton)
-            || this.displayEntries.find((e) => !e.completed);
+        return this.displayEntries.find((entry) => !entry.disableButton)
+            || this.displayEntries.find((entry) => !entry.completed);
     }
 
     get nextPunchLabel() {
+        if (this.isNextPunchDisabled) {
+            return `Office Check-In opens at ${this.formatTime(this.nextPunchEntry.officeCheckInOpensAt)}`;
+        }
         return this.nextPunchEntry ? this.nextPunchEntry.label : 'Log Attendance';
+    }
+
+    get isMainPunchDisabled() {
+        return this.isCapturing || this.isNextPunchDisabled;
+    }
+
+    get isNextPunchDisabled() {
+        return this.nextPunchEntry?.type === 'Office Check-In' &&
+            !!this.nextPunchEntry.officeCheckInOpensAt &&
+            new Date(this.nextPunchEntry.officeCheckInOpensAt).getTime() > this.clockNow;
     }
 
     openPunchModal() {
@@ -276,8 +403,8 @@ export default class AttendanceCapture extends LightningElement {
 
     formatTime(isoString) {
         if (!isoString) return '—';
-        const d = new Date(isoString);
-        return d.toLocaleTimeString('en-IN', {
+        const eventDate = new Date(isoString);
+        return eventDate.toLocaleTimeString('en-IN', {
             timeZone: 'Asia/Kolkata',
             hour: '2-digit',
             minute: '2-digit',
@@ -314,49 +441,103 @@ export default class AttendanceCapture extends LightningElement {
         return 'badge badge_muted';
     }
 
-    handleCapture(event) {
+    async handleCapture(event) {
         this.errorMessage = '';
         this.resultMessage = '';
         this.selectedPunchType = event.currentTarget.dataset.type;
         this.isCapturing = true;
+        this.isGettingLocation = true;
 
-        if (!navigator.geolocation) {
+        if (!navigator.geolocation || !navigator.geolocation.watchPosition) {
             this.errorMessage = 'Location isn\'t supported on this device/browser.';
             this.isCapturing = false;
+            this.isGettingLocation = false;
             return;
         }
 
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                this.capturedCoords = position.coords;
+        try {
+            this.capturedCoords = await this.getBestLocation();
+            this.isGettingLocation = false;
 
-                const entry = this.record
-                    ? this.record.entries.find((e) => e.type === this.selectedPunchType)
-                    : null;
+            const entry = this.record
+                ? this.record.entries.find((recordEntry) => recordEntry.type === this.selectedPunchType)
+                : null;
 
-                // No photo required for this punch (e.g. Office Check-Out): submit directly
-                if (entry && entry.needsPhoto === false) {
-                    this.doSubmit(null, null);
+            // No photo required for this punch (e.g. Office Check-Out): submit directly
+            if (entry && entry.needsPhoto === false) {
+                this.doSubmit(null, null);
+                return;
+            }
+
+            this.openCameraModal();
+        } catch (error) {
+            this.errorMessage = this.locationErrorMessage(error);
+            this.isCapturing = false;
+            this.isGettingLocation = false;
+        }
+    }
+
+    getBestLocation() {
+        return new Promise((resolve, reject) => {
+            let bestPosition;
+            let lastLocationError;
+            let watchId;
+            let sampleTimerId;
+            let isFinished = false;
+
+            const finishSampling = (error) => {
+                if (isFinished) {
                     return;
                 }
+                isFinished = true;
+                window.clearTimeout(sampleTimerId);
+                if (watchId !== undefined) {
+                    navigator.geolocation.clearWatch(watchId);
+                }
+                if (bestPosition) {
+                    resolve(bestPosition.coords);
+                } else {
+                    reject(error || lastLocationError || {
+                        code: 3,
+                        message: 'No GPS reading was available. Please try again.'
+                    });
+                }
+            };
 
-                this.openCameraModal();
-            },
-            (error) => {
-                this.errorMessage = this.locationErrorMessage(error);
-                this.isCapturing = false;
-            },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-        );
+            // Bound the GPS sampling period so a location watch cannot remain open indefinitely.
+            // eslint-disable-next-line @lwc/lwc/no-async-operation
+            sampleTimerId = window.setTimeout(
+                () => finishSampling(lastLocationError),
+                LOCATION_SAMPLE_DURATION_MS
+            );
+
+            watchId = navigator.geolocation.watchPosition(
+                (position) => {
+                    const accuracy = position.coords.accuracy;
+                    if (Number.isFinite(accuracy) &&
+                        (!bestPosition || accuracy < bestPosition.coords.accuracy)) {
+                        bestPosition = position;
+                    }
+                    if (bestPosition && bestPosition.coords.accuracy <= TARGET_LOCATION_ACCURACY_METERS) {
+                        finishSampling();
+                    }
+                },
+                (error) => {
+                    lastLocationError = error;
+                    finishSampling(error);
+                },
+                { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+            );
+        });
     }
 
     locationErrorMessage(error) {
         switch (error.code) {
-            case error.PERMISSION_DENIED:
+            case 1:
                 return 'Location access is turned off for this site. Enable it in your browser\'s site settings, then try again.';
-            case error.POSITION_UNAVAILABLE:
+            case 2:
                 return 'Couldn\'t determine your location. Move to an area with better signal and try again.';
-            case error.TIMEOUT:
+            case 3:
                 return 'Location took too long to respond. Please try again.';
             default:
                 return 'Location error: ' + error.message;
@@ -399,8 +580,8 @@ export default class AttendanceCapture extends LightningElement {
             if (this.historyLoaded) {
                 this.loadHistory();
             }
-        } catch (e) {
-            this.errorMessage = e?.body?.message ?? e?.message ?? 'An unexpected error occurred.';
+        } catch (error) {
+            this.errorMessage = error?.body?.message ?? error?.message ?? 'An unexpected error occurred.';
         } finally {
             this.isCapturing = false;
             this.selectedPunchType = null;
@@ -438,8 +619,8 @@ export default class AttendanceCapture extends LightningElement {
             if (this.historyLoaded) {
                 this.loadHistory();
             }
-        } catch (e) {
-            this.historyErrorMessage = e?.body?.message ?? e?.message ?? 'An unexpected error occurred.';
+        } catch (error) {
+            this.historyErrorMessage = error?.body?.message ?? error?.message ?? 'An unexpected error occurred.';
         } finally {
             this.isSubmittingAppeal = false;
         }
@@ -451,8 +632,8 @@ export default class AttendanceCapture extends LightningElement {
             const today = new Date();
             const past = new Date();
             past.setDate(past.getDate() - 7);
-            this.historyEndDate = isoDate(today);
-            this.historyStartDate = isoDate(past);
+            this.historyEndDate = formatIsoDate(today);
+            this.historyStartDate = formatIsoDate(past);
             this.loadHistory();
         }
     }
@@ -530,28 +711,31 @@ export default class AttendanceCapture extends LightningElement {
                 lateOnly: this.historyLateOnly,
                 pageNumber: this.historyPageNumber
             });
-            this.historyRows = result.records.map((r) => this.mapHistoryRow(r));
+            this.historyRows = result.records.map((attendanceRecord) => this.mapHistoryRow(attendanceRecord));
             this.historyTotalCount = result.totalCount;
 
-            this.totalLateCount = result.records.filter(row => 
-                (row.Office_Late_Minutes__c && row.Office_Late_Minutes__c > 0) || 
-                (row.Lunch_Late_Minutes__c && row.Lunch_Late_Minutes__c > 0)
+            this.officeLateCount = result.records.filter(
+                row => Number(row.Office_Late_Minutes__c || 0) > 0
             ).length;
+            this.lunchLateCount = result.records.filter(
+                row => Number(row.Lunch_Late_Minutes__c || 0) > 0
+            ).length;
+            this.totalLateCount = this.officeLateCount + this.lunchLateCount;
 
             this.totalDeductionAmount = result.records.reduce((sum, row) => sum + (row.Total_Deduction_Amount__c || 0), 0);
 
             this.historyLoaded = true;
-        } catch (e) {
-            this.historyErrorMessage = e?.body?.message ?? e?.message ?? 'An unexpected error occurred.';
+        } catch (error) {
+            this.historyErrorMessage = error?.body?.message ?? error?.message ?? 'An unexpected error occurred.';
         } finally {
             this.isHistoryLoading = false;
         }
     }
 
-    mapHistoryRow(r) {
-        const deduction = r.Total_Deduction_Amount__c || 0;
-        const statuses = r.Attendance_Logs__r
-            ? r.Attendance_Logs__r.map((log) => log.Status__c).filter(Boolean)
+    mapHistoryRow(attendanceRecord) {
+        const deduction = attendanceRecord.Total_Deduction_Amount__c || 0;
+        const statuses = attendanceRecord.Attendance_Logs__r
+            ? attendanceRecord.Attendance_Logs__r.map((attendanceLog) => attendanceLog.Status__c).filter(Boolean)
             : [];
 
         let statusText = 'On time';
@@ -567,24 +751,24 @@ export default class AttendanceCapture extends LightningElement {
             statusClass = 'badge badge_warning';
         }
         return {
-            id: r.Id,
-            date: this.formatDate(r.Date__c),
-            officeIn: this.formatTime(r.Office_Check_In_Time__c),
-            officeOut: this.formatTime(r.Office_Check_Out_Time__c),
-            lunchIn: this.formatTime(r.Lunch_In_Time__c),
-            lunchOut: this.formatTime(r.Lunch_Out_Time__c),
-            officeLateMinutes: this.formatLateMinutes(r.Office_Late_Minutes__c || 0),
-            lunchLateMinutes: this.formatLateMinutes(r.Lunch_Late_Minutes__c || 0),
+            id: attendanceRecord.Id,
+            date: this.formatDate(attendanceRecord.Date__c),
+            officeIn: this.formatTime(attendanceRecord.Office_Check_In_Time__c),
+            officeOut: this.formatTime(attendanceRecord.Office_Check_Out_Time__c),
+            lunchIn: this.formatTime(attendanceRecord.Lunch_In_Time__c),
+            lunchOut: this.formatTime(attendanceRecord.Lunch_Out_Time__c),
+            officeLateMinutes: this.formatLateMinutes(attendanceRecord.Office_Late_Minutes__c || 0),
+            lunchLateMinutes: this.formatLateMinutes(attendanceRecord.Lunch_Late_Minutes__c || 0),
             deduction,
             statusText,
             statusClass
         };
     }
 
-    formatDate(d) {
-        if (!d) return '—';
-        const dt = new Date(d + 'T00:00:00');
-        return dt.toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
+    formatDate(dateValue) {
+        if (!dateValue) return '—';
+        const date = new Date(dateValue + 'T00:00:00');
+        return date.toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
     }
 
     get hasHistoryRows() {

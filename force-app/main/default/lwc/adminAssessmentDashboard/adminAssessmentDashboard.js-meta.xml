@@ -9,4 +9,15 @@
         <target>lightningCommunity__Page</target>
         <target>lightningCommunity__Default</target>
     </targets>
+    <targetConfigs>
+        <targetConfig targets="lightningCommunity__Default">
+            <property
+                name="dashboardSubtitle"
+                type="String"
+                label="Instruction Text"
+                description="Configurable instruction shown below the Admin Console heading."
+                default="Select an external student or contact to view assignments and results."
+            />
+        </targetConfig>
+    </targetConfigs>
 </LightningComponentBundle>

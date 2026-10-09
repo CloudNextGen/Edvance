@@ -43,11 +43,113 @@
     align-items: center;
     gap: 0.6rem;
     flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.stats-wrap {
+    display: flex;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.filter-btn {
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--ink-soft);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.35rem 0.85rem;
+    border-radius: 999px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.filter-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow);
+}
+
+.filter-btn_active {
+    background: var(--ink);
+    color: #fff;
+    border-color: var(--ink);
+}
+
+.stat-open {
+    background: #E9F0FF;
+    color: #2E5FDB;
+    border-color: #C7D8FA;
+}
+
+.stat-open_active {
+    background: #2E5FDB;
+    color: #fff;
+    border-color: #2E5FDB;
+}
+
+.stat-progress {
+    background: #FFF3DE;
+    color: #B96A00;
+    border-color: #F5D9A0;
+}
+
+.stat-progress_active {
+    background: #B96A00;
+    color: #fff;
+    border-color: #B96A00;
+}
+
+.stat-completed {
+    background: #E6F7F1;
+    color: #0B8A63;
+    border-color: #B9EAD7;
+}
+
+.stat-completed_active {
+    background: #0B8A63;
+    color: #fff;
+    border-color: #0B8A63;
 }
 
 .refresh-btn {
-    padding: 0.4rem 0.85rem;
-    font-size: 0.78rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    min-height: 2.5rem;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 1.25rem;
+    line-height: 1;
+    flex: 0 0 2.5rem;
+}
+
+.refresh-icon {
+    display: block;
+    line-height: 1;
+}
+
+.refresh-spinner {
+    width: 0.85rem;
+    height: 0.85rem;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: refresh-spin 0.7s linear infinite;
+}
+
+@keyframes refresh-spin {
+    to { transform: rotate(360deg); }
+}
+
+.new-request-actions {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 8000;
 }
 
 .eyebrow {

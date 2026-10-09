@@ -2,9 +2,10 @@ import { LightningElement, track } from 'lwc';
 import getLearningContentTree from '@salesforce/apex/LearningContentController.getLearningContentTree';
 import markFileComplete from '@salesforce/apex/LearningContentController.markFileComplete';
 import recordFileOpened from '@salesforce/apex/LearningContentController.recordFileOpened';
-import debugNextContentFolder from '@salesforce/apex/LearningContentController.debugNextContentFolder';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import submitFileFeedback from '@salesforce/apex/LearningContentController.submitFileFeedback';
+import requestNextContentAccess from '@salesforce/apex/LearningContentController.requestNextContentAccess';
+import getNextContentAccessRequestStatus from '@salesforce/apex/LearningContentController.getNextContentAccessRequestStatus';
 import HERO2_SVG from '@salesforce/resourceUrl/Hero2_SVG';
 
 export default class LearningContentBrowser extends LightningElement {
@@ -20,6 +21,15 @@ export default class LearningContentBrowser extends LightningElement {
     feedbackComment = '';
     isFeedbackSubmitting = false;
     feedbackModalError;
+    isAccessRequestSubmitting = false;
+    isNextContentRequestAvailable = false;
+    accessRequestSent = false;
+    accessRequestNotificationSent = false;
+    accessRequestWasCreated = false;
+    accessRequestStatus;
+    accessRequestCanNotifyAgain = false;
+    accessRequestFolderId;
+    isCheckingAccessRequest = false;
     now = Date.now(); // Ticks every 500ms; drives the timer countdown reactively
     error;
     isLoading = true;
@@ -66,12 +76,19 @@ export default class LearningContentBrowser extends LightningElement {
                 // files/updated statuses will never show up in the UI.
                 if (this.breadcrumbs.length > 0) {
                     const targetId = this.breadcrumbs[this.breadcrumbs.length - 1].id;
-                    this.currentFolder = this.findFolderById(this.rootFolders, targetId);
+                    const restoredFolder = this.findFolderById(this.rootFolders, targetId);
+                    if (restoredFolder) {
+                        this.currentFolder = restoredFolder;
+                    } else {
+                        this.breadcrumbs = [];
+                        this.currentFolder = undefined;
+                    }
                 } else {
                     this.currentFolder = undefined;
                 }
 
                 this.persistNavigationState();
+                this.loadAccessRequestStatus();
             })
             .catch((error) => {
                 this.error = error.body ? error.body.message : error.message;
@@ -101,7 +118,12 @@ export default class LearningContentBrowser extends LightningElement {
     }
 
     get isEmpty() {
-        return !this.isLoading && !this.itemsToShow.hasFolders && !this.itemsToShow.hasFiles;
+        return !this.isLoading && !this.error && !this.itemsToShow.hasFolders && !this.itemsToShow.hasFiles;
+    }
+
+    get isAccessRestricted() {
+        const message = (this.error || '').toLowerCase();
+        return message.includes('team member') && message.includes('files and assignments');
     }
 
     get showRootHero() {
@@ -112,21 +134,21 @@ export default class LearningContentBrowser extends LightningElement {
         return this.breadcrumbs.length > 0;
     }
 
-    naturalCompare(a, b) {
-        return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
+    naturalCompare(firstName, secondName) {
+        return String(firstName).localeCompare(String(secondName), undefined, { numeric: true, sensitivity: 'base' });
     }
 
     // Sort by Sort_Order__c first (nulls last), falling back to natural name compare
     sortBySortOrderThenName(list) {
-        return [...list].sort((a, b) => {
-            const aOrder = a.sortOrder;
-            const bOrder = b.sortOrder;
-            if (aOrder != null && bOrder != null && aOrder !== bOrder) {
-                return aOrder - bOrder;
+        return [...list].sort((firstItem, secondItem) => {
+            const firstSortOrder = firstItem.sortOrder;
+            const secondSortOrder = secondItem.sortOrder;
+            if (firstSortOrder != null && secondSortOrder != null && firstSortOrder !== secondSortOrder) {
+                return firstSortOrder - secondSortOrder;
             }
-            if (aOrder != null && bOrder == null) return -1;
-            if (aOrder == null && bOrder != null) return 1;
-            return this.naturalCompare(a.name, b.name);
+            if (firstSortOrder != null && secondSortOrder == null) return -1;
+            if (firstSortOrder == null && secondSortOrder != null) return 1;
+            return this.naturalCompare(firstItem.name, secondItem.name);
         });
     }
 
@@ -138,14 +160,14 @@ export default class LearningContentBrowser extends LightningElement {
 
     get displayFolders() {
         return this.sortBySortOrderThenName(this.itemsToShow.folders)
-            .map((f, idx) => {
-                const subCount = f.subFolders ? f.subFolders.length : 0;
-                const fileCount = f.files ? f.files.length : 0;
+            .map((folder, folderIndex) => {
+                const subCount = folder.subFolders ? folder.subFolders.length : 0;
+                const fileCount = folder.files ? folder.files.length : 0;
                 return {
-                    ...f,
-                    cardClass: `lc-folder-card ${this._catAccents[idx % this._catAccents.length]}`,
+                    ...folder,
+                    cardClass: `lc-folder-card ${this._catAccents[folderIndex % this._catAccents.length]}`,
                     iconName: this.DEFAULT_FOLDER_ICON,
-                    iconClass: `lc-folder-icon lc-icon-${idx % this._catAccents.length}`,
+                    iconClass: `lc-folder-icon lc-icon-${folderIndex % this._catAccents.length}`,
                     fileCount,
                     subCount,
                     countsLabel: `${this.pluralize(subCount, 'folder')} · ${this.pluralize(fileCount, 'file')}`
@@ -155,19 +177,19 @@ export default class LearningContentBrowser extends LightningElement {
 
     get displayFiles() {
         return this.sortBySortOrderThenName(this.itemsToShow.files)
-            .map((f) => {
-                const isCompleted = f.completionStatus === 'Completed';
-                const hasBeenOpened = f.dateTimeOpened != null;
-                const isAccessRevoked = f.accessRevoked === true;
+            .map((learningFile) => {
+                const isCompleted = learningFile.completionStatus === 'Completed';
+                const hasBeenOpened = learningFile.dateTimeOpened != null;
+                const isAccessRevoked = learningFile.accessRevoked === true;
 
                 // Compute remaining time directly from `now`, no separate cache
                 // to fall out of sync or default to 0 during a render race.
                 let remainingSeconds = 0;
-                const parsedMinutes = Number(f.estimatedTimeMinutes);
+                const parsedMinutes = Number(learningFile.estimatedTimeMinutes);
                 const durationSeconds = Number.isFinite(parsedMinutes) && parsedMinutes > 0 ? parsedMinutes * 60 : 0;
 
                 if (hasBeenOpened && durationSeconds > 0) {
-                    const openedTime = Date.parse(f.dateTimeOpened);
+                    const openedTime = Date.parse(learningFile.dateTimeOpened);
                     if (Number.isFinite(openedTime)) {
                         const elapsedSeconds = Math.floor((this.now - openedTime) / 1000);
                         remainingSeconds = Math.max(0, durationSeconds - elapsedSeconds);
@@ -175,12 +197,13 @@ export default class LearningContentBrowser extends LightningElement {
                 }
 
                 // If opened but no estimated time was ever set, treat as expired immediately
-                const timeExpired = !isAccessRevoked && hasBeenOpened && (!f.estimatedTimeMinutes || remainingSeconds <= 0);
+                const timeExpired = !isAccessRevoked && hasBeenOpened &&
+                    (!learningFile.estimatedTimeMinutes || remainingSeconds <= 0);
                 const canMarkComplete = !isCompleted && !isAccessRevoked && hasBeenOpened && timeExpired;
 
                 return {
-                    ...f,
-                    iconName: this.fileIconName(f.mimeType, f.name),
+                    ...learningFile,
+                    iconName: this.fileIconName(learningFile.mimeType, learningFile.name),
                     isCompleted,
                     hasBeenOpened,
                     isAccessRevoked,
@@ -228,14 +251,14 @@ export default class LearningContentBrowser extends LightningElement {
     get nextContentFolderEntry() {
         if (!this.currentFolder) return null;
         const list = this.orderedContentFolderEntries;
-        const idx = list.findIndex((entry) => entry.folder.id === this.currentFolder.id);
-        if (idx === -1 || idx + 1 >= list.length) return null;
-        return list[idx + 1];
+        const currentFolderIndex = list.findIndex((entry) => entry.folder.id === this.currentFolder.id);
+        if (currentFolderIndex === -1 || currentFolderIndex + 1 >= list.length) return null;
+        return list[currentFolderIndex + 1];
     }
 
     get allFilesCompletedInFolder() {
         const files = this.itemsToShow.files;
-        return files.length > 0 && files.every((f) => f.completionStatus === 'Completed');
+        return files.length > 0 && files.every((learningFile) => learningFile.completionStatus === 'Completed');
     }
 
     get showNextLessonButton() {
@@ -272,12 +295,123 @@ export default class LearningContentBrowser extends LightningElement {
         return this.allFilesCompletedInFolder && this.nextContentFolderEntry == null && totalCount > visibleCount;
     }
 
+    get showAccessRequestActions() {
+        return this.allFilesCompletedInFolder &&
+            this.isNextContentRequestAvailable &&
+            !this.showNextLessonButton;
+    }
+
     get accessGapMessage() {
         if (!this.currentFolder || !this.showAccessGapMessage) {
             return '';
         }
 
         return 'Next file and folder are locked. Please contact your Admin/Mentor for access.';
+    }
+
+    get hasRequestedCurrentFolderAccess() {
+        return this.accessRequestSent && this.accessRequestFolderId === this.currentFolder?.id;
+    }
+
+    get isAccessRequestDisabled() {
+        return this.isCheckingAccessRequest || this.isAccessRequestSubmitting ||
+            (this.hasRequestedCurrentFolderAccess &&
+                (!this.accessRequestCanNotifyAgain || this.accessRequestNotificationSent));
+    }
+
+    get accessRequestButtonLabel() {
+        if (this.isCheckingAccessRequest) return 'Checking request...';
+        if (this.isAccessRequestSubmitting) return 'Sending request...';
+        if (!this.hasRequestedCurrentFolderAccess) return 'Request access from Mentor';
+        if (!this.accessRequestCanNotifyAgain) {
+            return this.accessRequestStatus === 'Working' ? 'Request in progress' : 'Request completed';
+        }
+        if (this.accessRequestNotificationSent) {
+            return this.accessRequestWasCreated ? 'Request sent' : 'Reminder sent';
+        }
+        return 'Notify mentor again';
+    }
+
+    get accessRequestCaption() {
+        if (this.accessRequestStatus === 'Working') {
+            return 'Your mentor is reviewing this request.';
+        }
+        if (this.accessRequestStatus === 'Closed') {
+            return 'This request is completed. Contact your mentor if you still need access.';
+        }
+        return 'An open request already exists. You can notify your mentor again if needed.';
+    }
+
+    loadAccessRequestStatus() {
+        const folderId = this.currentFolder?.id;
+        this.accessRequestFolderId = folderId;
+        this.accessRequestSent = false;
+        this.accessRequestNotificationSent = false;
+        this.accessRequestWasCreated = false;
+        this.accessRequestStatus = undefined;
+        this.accessRequestCanNotifyAgain = false;
+        if (!folderId) {
+            this.isCheckingAccessRequest = false;
+            return;
+        }
+
+        this.isCheckingAccessRequest = true;
+        this.isNextContentRequestAvailable = false;
+        getNextContentAccessRequestStatus({ currentFolderId: folderId })
+            .then((requestStatus) => {
+                if (this.currentFolder?.id === folderId) {
+                    this.isNextContentRequestAvailable = requestStatus.available === true;
+                    this.accessRequestSent = requestStatus.alreadyRequested === true;
+                    this.accessRequestStatus = requestStatus.requestStatus;
+                    this.accessRequestCanNotifyAgain = requestStatus.canNotifyAgain === true;
+                }
+            })
+            .catch((error) => {
+                this.dispatchEvent(new ShowToastEvent({
+                    title: 'Error',
+                    message: error.body?.message || 'The access request status could not be checked.',
+                    variant: 'error'
+                }));
+            })
+            .finally(() => {
+                if (this.currentFolder?.id === folderId) {
+                    this.isCheckingAccessRequest = false;
+                }
+            });
+    }
+
+    async handleRequestNextContentAccess() {
+        if (!this.currentFolder || this.isAccessRequestDisabled) {
+            return;
+        }
+
+        this.isAccessRequestSubmitting = true;
+        try {
+            const result = await requestNextContentAccess({
+                currentFolderId: this.currentFolder.id
+            });
+            this.accessRequestSent = true;
+            this.accessRequestFolderId = this.currentFolder.id;
+            this.accessRequestStatus = result.requestStatus;
+            this.accessRequestCanNotifyAgain = result.canNotifyAgain === true;
+            this.accessRequestNotificationSent = true;
+            this.accessRequestWasCreated = !result.alreadyRequested;
+            this.dispatchEvent(new ShowToastEvent({
+                title: result.alreadyRequested ? 'Mentor Notified' : 'Request Sent',
+                message: result.message,
+                variant: 'success'
+            }));
+        } catch (error) {
+            const message = error?.body?.message || error?.message || 'Unable to send your access request.';
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Request Failed',
+                message,
+                variant: 'error',
+                mode: 'sticky'
+            }));
+        } finally {
+            this.isAccessRequestSubmitting = false;
+        }
     }
 
     handleNextLessonClick() {
@@ -288,6 +422,7 @@ export default class LearningContentBrowser extends LightningElement {
         // swap the last breadcrumb like a same-level sibling jump would.
         this.breadcrumbs = entry.path;
         this.currentFolder = entry.folder;
+        this.loadAccessRequestStatus();
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -330,9 +465,13 @@ export default class LearningContentBrowser extends LightningElement {
         const existingBreadcrumbs = params.get('breadcrumbs');
         if (existingBreadcrumbs) {
             try {
-                this.breadcrumbs = JSON.parse(decodeURIComponent(existingBreadcrumbs));
-            } catch (e) {
-                this.breadcrumbs = [];
+                this.breadcrumbs = JSON.parse(existingBreadcrumbs);
+            } catch {
+                try {
+                    this.breadcrumbs = JSON.parse(decodeURIComponent(existingBreadcrumbs));
+                } catch {
+                    this.breadcrumbs = [];
+                }
             }
         } else {
             this.breadcrumbs = [];
@@ -345,14 +484,15 @@ export default class LearningContentBrowser extends LightningElement {
         const params = new URLSearchParams(window.location.search);
         if (this.breadcrumbs.length > 0 && this.currentFolder) {
             params.set('folderId', this.currentFolder.id);
-            params.set('breadcrumbs', encodeURIComponent(JSON.stringify(this.breadcrumbs)));
+            params.set('breadcrumbs', JSON.stringify(this.breadcrumbs));
         } else {
             params.delete('folderId');
             params.delete('breadcrumbs');
         }
 
-        /*const newUrl = `${window.location.pathname}?${params.toString()}`;
-        window.history.replaceState({}, '', newUrl);*/
+        const query = params.toString();
+        const newUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`;
+        window.history.replaceState(window.history.state, '', newUrl);
     }
 
     handleFolderClick(event) {
@@ -363,6 +503,7 @@ export default class LearningContentBrowser extends LightningElement {
             this.breadcrumbs = [...this.breadcrumbs, { id: folder.id, name: folder.name }];
             this.currentFolder = folder;
             this.persistNavigationState();
+            this.loadAccessRequestStatus();
         }
     }
 
@@ -373,13 +514,17 @@ export default class LearningContentBrowser extends LightningElement {
             this.breadcrumbs = [];
             this.currentFolder = undefined;
             this.persistNavigationState();
+            this.loadAccessRequestStatus();
             return;
         }
 
-        const idx = this.breadcrumbs.findIndex((b) => b.id === targetId);
-        this.breadcrumbs = this.breadcrumbs.slice(0, idx + 1);
+        const targetBreadcrumbIndex = this.breadcrumbs.findIndex(
+            (breadcrumb) => breadcrumb.id === targetId
+        );
+        this.breadcrumbs = this.breadcrumbs.slice(0, targetBreadcrumbIndex + 1);
         this.currentFolder = this.findFolderById(this.rootFolders, targetId);
         this.persistNavigationState();
+        this.loadAccessRequestStatus();
     }
 
     handleBackClick() {
@@ -387,6 +532,7 @@ export default class LearningContentBrowser extends LightningElement {
             this.breadcrumbs = [];
             this.currentFolder = undefined;
             this.persistNavigationState();
+            this.loadAccessRequestStatus();
             return;
         }
         const newCrumbs = this.breadcrumbs.slice(0, -1);
@@ -394,13 +540,14 @@ export default class LearningContentBrowser extends LightningElement {
         this.breadcrumbs = newCrumbs;
         this.currentFolder = this.findFolderById(this.rootFolders, targetId);
         this.persistNavigationState();
+        this.loadAccessRequestStatus();
     }
 
-    findFolderById(folders, id) {
-        for (const f of folders) {
-            if (f.id === id) return f;
-            if (f.subFolders && f.subFolders.length) {
-                const found = this.findFolderById(f.subFolders, id);
+    findFolderById(folders, targetFolderId) {
+        for (const folder of folders) {
+            if (folder.id === targetFolderId) return folder;
+            if (folder.subFolders && folder.subFolders.length) {
+                const found = this.findFolderById(folder.subFolders, targetFolderId);
                 if (found) return found;
             }
         }
@@ -411,9 +558,14 @@ export default class LearningContentBrowser extends LightningElement {
         event.stopPropagation();
         const url = event.currentTarget.dataset.url;
         const fileId = event.currentTarget.dataset.fileId;
-        const file = this.displayFiles.find((f) => f.id === fileId);
+        const file = this.displayFiles.find((learningFile) => learningFile.id === fileId);
 
         if (!file) {
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Error',
+                message: 'This learning file could not be found. Refresh the page and try again.',
+                variant: 'error'
+            }));
             return;
         }
 
@@ -428,7 +580,11 @@ export default class LearningContentBrowser extends LightningElement {
                     this.loadTree();
                 })
                 .catch((error) => {
-                    console.error('Error recording file open:', error.body ? error.body.message : error.message);
+                    this.dispatchEvent(new ShowToastEvent({
+                        title: 'Error',
+                        message: error.body?.message || 'The learning file view could not be recorded.',
+                        variant: 'error'
+                    }));
                 });
         }
 
@@ -443,15 +599,13 @@ export default class LearningContentBrowser extends LightningElement {
         event.stopPropagation();
 
         const fileId = event.currentTarget.dataset.fileId;
-        const file = this.displayFiles.find((f) => f.id === fileId);
+        const file = this.displayFiles.find((learningFile) => learningFile.id === fileId);
 
         if (!file) {
-            console.error('File not found');
             return;
         }
 
         if (!file.canMarkComplete) {
-            console.warn('Cannot mark complete - time not yet expired');
             return;
         }
 
@@ -459,10 +613,6 @@ export default class LearningContentBrowser extends LightningElement {
 
         markFileComplete({ fileId: file.id })
             .then((result) => {
-                // Log the raw result for debugging why the Next Lesson button
-                // might not appear (e.g. nextFolderUnlocked flag).
-                console.log('markFileComplete result:', result);
-
                 // If the server created access for the first file of the next
                 // folder, set a transient flag so the Next Lesson button can
                 // be shown immediately while we reload the tree.
@@ -471,28 +621,11 @@ export default class LearningContentBrowser extends LightningElement {
                 // Wait for the refreshed tree so computed getters reflect the
                 // updated completion/access state before we clear loading.
                 return this.loadTree().then(() => {
-                    if (result.nextFileId) {
-                        console.log(`File completed! Next file: ${result.nextFileName}`);
-                    } else if (result.nextFolderUnlocked) {
-                        console.log('File completed! Next folder unlocked.');
-                    } else {
-                        console.log('File completed! No more files in this folder.');
-                    }
                     // Clear the transient flag if the refreshed tree already
                     // exposes the next content folder entry.
                     if (this.nextContentFolderEntry) {
                         this._nextFolderUnlockedPending = false;
                     }
-                    // Also request server diagnostics and print them to the
-                    // browser console so Community users can paste the output.
-                    const currentFolderId = this.currentFolder ? this.currentFolder.id : null;
-                    debugNextContentFolder({ currentFolderId })
-                        .then((dbg) => {
-                            console.log('debugNextContentFolder:', dbg);
-                        })
-                        .catch((e) => {
-                            console.warn('debugNextContentFolder error:', e.body ? e.body.message : e.message);
-                        });
                 });
             })
             .catch((error) => {
@@ -506,7 +639,7 @@ export default class LearningContentBrowser extends LightningElement {
     handleFeedbackIconClick(event) {
         event.stopPropagation();
         const fileId = event.currentTarget.dataset.fileId;
-        const file = this.displayFiles.find((f) => f.id === fileId);
+        const file = this.displayFiles.find((learningFile) => learningFile.id === fileId);
         this.feedbackFileId = fileId;
         this.feedbackFileName = file ? file.name : '';
         this.feedbackComment = '';

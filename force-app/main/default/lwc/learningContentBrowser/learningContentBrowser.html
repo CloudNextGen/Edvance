@@ -43,7 +43,15 @@
             </template>
 
             <template if:true={error}>
-                <div class="lc-error">Couldn't load content: {error}</div>
+                <template if:true={isAccessRestricted}>
+                    <div class="lc-access-warning" role="status">
+                        <lightning-icon icon-name="utility:warning" size="x-small" alternative-text="Access restricted"></lightning-icon>
+                        <span>{error}</span>
+                    </div>
+                </template>
+                <template if:false={isAccessRestricted}>
+                    <div class="lc-error" role="alert">Couldn't load content: {error}</div>
+                </template>
             </template>
 
             <template if:false={isLoading}>
@@ -210,7 +218,22 @@
 
                 <template if:true={showAccessGapMessage}>
                     <div class="path-warning-banner">
-                        ⚠️ {accessGapMessage}
+                        <span>⚠️ {accessGapMessage}</span>
+                    </div>
+                </template>
+
+                <template if:true={showAccessRequestActions}>
+                    <div class="access-request-actions">
+                        <button
+                            class="btn-request-access"
+                            onclick={handleRequestNextContentAccess}
+                            disabled={isAccessRequestDisabled}
+                            aria-label={accessRequestButtonLabel}>
+                            {accessRequestButtonLabel}
+                        </button>
+                        <template if:true={hasRequestedCurrentFolderAccess}>
+                            <span class="access-request-caption">{accessRequestCaption}</span>
+                        </template>
                     </div>
                 </template>
 

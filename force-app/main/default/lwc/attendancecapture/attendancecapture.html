@@ -19,7 +19,7 @@
                 <template if:false={isDone}>
                     <div class="punch-single-cta">
                         <button type="button" class="primary-btn primary-btn_full" onclick={openPunchModal}
-                            disabled={isCapturing}>
+                            disabled={isMainPunchDisabled}>
                             {nextPunchLabel} →
                         </button>
                     </div>
@@ -56,6 +56,12 @@
             </div>
 
             <!-- Messages -->
+            <template if:true={isGettingLocation}>
+                <div class="location-status" role="status" aria-live="polite">
+                    <lightning-spinner alternative-text="Getting precise location" size="small"></lightning-spinner>
+                    <span>Getting precise location…</span>
+                </div>
+            </template>
             <template if:true={resultMessage}>
                 <p class="alert alert_success">{resultMessage}</p>
             </template>
@@ -74,6 +80,14 @@
                             <div>
                                 <p class="punch-label">{entry.label}</p>
                                 <p class="punch-time">{entry.formattedTime}</p>
+                                <template if:true={entry.showLunchCountdown}>
+                                    <p class="lunch-countdown">
+                                        <lightning-icon icon-name="utility:clock" size="xx-small"
+                                            alternative-text="Lunch countdown"></lightning-icon>
+                                        <span>Lunch ends in</span>
+                                        <strong>{entry.lunchCountdownText}</strong>
+                                    </p>
+                                </template>
                             </div>
                         </div>
 
@@ -162,6 +176,9 @@
                         <div class="kpi-card">
                             <span class="kpi-title">Total Late Occurrences</span>
                             <span class="kpi-value">{totalLateCount}</span>
+                            <span class="kpi-breakdown">
+                                Office Late: {officeLateCount} <span aria-hidden="true">·</span> Lunch Late: {lunchLateCount}
+                            </span>
                         </div>
                         <div class="kpi-card">
                             <span class="kpi-title">Total Deductions</span>

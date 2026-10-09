@@ -9,6 +9,6 @@ trigger ErrorLogEventTrigger on Error_Log_Event__e (after insert) {
     }
 
     if (!logsToInsert.isEmpty()) {
-        insert logsToInsert;
+        Database.insert(logsToInsert, AccessLevel.SYSTEM_MODE);
     }
 }

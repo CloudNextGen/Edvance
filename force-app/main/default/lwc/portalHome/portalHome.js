@@ -39,7 +39,7 @@ export default class PortalHome extends LightningElement {
 
     get userFirstName() {
         return this.userRecord?.data
-            ? getFieldValueSafe(this.userRecord.data, FIRST_NAME_FIELD)
+            ? getUserFieldValue(this.userRecord.data, FIRST_NAME_FIELD)
             : '';
     }
 
@@ -85,10 +85,10 @@ export default class PortalHome extends LightningElement {
         this.isLoadingRecent = true;
         getRecentFiles({ limitCount: 5 })
             .then((data) => {
-                this.recentFiles = (data || []).map((f) => ({
-                    ...f,
-                    relativeTime: formatRelativeTime(f.lastAccessed),
-                    iconLetter: (f.name || '?').charAt(0).toUpperCase()
+                this.recentFiles = (data || []).map((recentFile) => ({
+                    ...recentFile,
+                    relativeTime: formatAccessTimeAgo(recentFile.lastAccessed),
+                    iconLetter: (recentFile.name || '?').charAt(0).toUpperCase()
                 }));
             })
             .catch(() => {
@@ -101,6 +101,10 @@ export default class PortalHome extends LightningElement {
 
     get hasRecentFiles() {
         return this.recentFiles.length > 0;
+    }
+
+    get showRecentSection() {
+        return !this.isLoadingRecent && this.hasRecentFiles;
     }
 
     get profileCards() {
@@ -135,6 +139,10 @@ export default class PortalHome extends LightningElement {
 
     get hasProfileCards() {
         return this.profileCards.length > 0;
+    }
+
+    get showProfileSection() {
+        return this.isCommunityUser && !this.isLoadingProfiles && this.hasProfileCards;
     }
 
     handleRecentFileClick(event) {
@@ -215,20 +223,20 @@ export default class PortalHome extends LightningElement {
     }
 }
 
-function getFieldValueSafe(record, fieldReference) {
+function getUserFieldValue(userRecord, fieldReference) {
     const fieldName = fieldReference.fieldApiName;
-    return record?.fields?.[fieldName]?.value || '';
+    return userRecord?.fields?.[fieldName]?.value || '';
 }
 
-function formatRelativeTime(dateTimeValue) {
+function formatAccessTimeAgo(dateTimeValue) {
     if (!dateTimeValue) return '';
-    const then = new Date(dateTimeValue).getTime();
-    const now = Date.now();
-    const diffMinutes = Math.floor((now - then) / 60000);
-    if (diffMinutes < 1) return 'Just now';
-    if (diffMinutes < 60) return `${diffMinutes} min ago`;
-    const diffHours = Math.floor(diffMinutes / 60);
-    if (diffHours < 24) return `${diffHours} hr ago`;
-    const diffDays = Math.floor(diffHours / 24);
-    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+    const accessTimestamp = new Date(dateTimeValue).getTime();
+    const currentTimestamp = Date.now();
+    const minutesSinceAccess = Math.floor((currentTimestamp - accessTimestamp) / 60000);
+    if (minutesSinceAccess < 1) return 'Just now';
+    if (minutesSinceAccess < 60) return `${minutesSinceAccess} min ago`;
+    const hoursSinceAccess = Math.floor(minutesSinceAccess / 60);
+    if (hoursSinceAccess < 24) return `${hoursSinceAccess} hr ago`;
+    const daysSinceAccess = Math.floor(hoursSinceAccess / 24);
+    return `${daysSinceAccess} day${daysSinceAccess === 1 ? '' : 's'} ago`;
 }

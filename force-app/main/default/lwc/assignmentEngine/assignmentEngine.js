@@ -2,6 +2,7 @@ import { LightningElement, track, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import getEligibleCategories from '@salesforce/apex/AssignmentService.getEligibleCategories';
 import getAssignmentsForCategory from '@salesforce/apex/AssignmentService.getAssignmentsForCategory';
+import requestNextAssignmentAccess from '@salesforce/apex/AssignmentService.requestNextAssignmentAccess';
 import getAssignmentQuestions from '@salesforce/apex/AssignmentService.getAssignmentQuestions';
 import submitAssignment from '@salesforce/apex/AssignmentService.submitAssignment';
 import getSubmissionAttempts from '@salesforce/apex/AssignmentService.getSubmissionAttempts';
@@ -12,7 +13,7 @@ import submitQuestionFeedback from '@salesforce/apex/AssignmentService.submitQue
 import SVG_RESOURCE from '@salesforce/resourceUrl/Hero_SVG';
 
 // Key used to persist in-progress state across a browser refresh (sessionStorage = tab-scoped, cleared on tab close)
-const STATE_KEY = 'sap_engine_state_v1';
+const ASSIGNMENT_ENGINE_STATE_KEY = 'sap_engine_state_v1';
 const BANNER_AUTOHIDE_MS = 60000; // 1 minute
 const NAV_COMPONENT_MATCHERS = ['COMMUNITY_NAVIGATION', 'FORCECOMMUNITY', 'COMM-NAVIGATION'];
 
@@ -44,6 +45,7 @@ export default class AssignmentEngine extends LightningElement {
     isStartDisabled = true;
     countdownIntervalId = null;
     isRefreshingAssignments = false;
+    assignmentAccessRequestId;
     isAppReady = false; // true once we know which screen to show (either "no saved state" or "restore finished")
 
     @track answersMap = {};
@@ -131,13 +133,15 @@ export default class AssignmentEngine extends LightningElement {
     }
 
     get isEmpty() {
-        return this.categories.length === 0;
+        return this.categories.length === 0 && !this.categoryAccessWarning;
     }
 
+    categoryAccessWarning;
+
     get feedbackScreenQuestions() {
-        return this.questions.map((q) => ({
-            ...q,
-            feedbackGiven: !!this.submittedFeedbackQuestionIds[q.Id]
+        return this.questions.map((question) => ({
+            ...question,
+            feedbackGiven: !!this.submittedFeedbackQuestionIds[question.Id]
         }));
     }
 
@@ -154,7 +158,7 @@ export default class AssignmentEngine extends LightningElement {
             this.assignmentPageSize = data.Assignment_Page_Size__c || 5;
             this.questionPageSize = data.Question_Page_Size__c || 5;
         } else if (error) {
-            console.error('Error loading pagination settings metadata:', error);
+            this.showToast('Error', 'Assessment pagination settings could not be loaded.', 'error');
         }
     }
 
@@ -188,15 +192,23 @@ export default class AssignmentEngine extends LightningElement {
     @wire(getEligibleCategories)
     wiredCategories({ error, data }) {
         if (data) {
-            this.categories = data.map((cat, idx) => ({
-                ...cat,
-                iconName:    this._catIcons[idx % this._catIcons.length].icon,
-                iconClass:   this._catIcons[idx % this._catIcons.length].cls,
-                cardClass:   `cat-card cat-accent-${idx % this._catIcons.length}`,
+            this.categoryAccessWarning = undefined;
+            this.categories = data.map((category, categoryIndex) => ({
+                ...category,
+                iconName:    this._catIcons[categoryIndex % this._catIcons.length].icon,
+                iconClass:   this._catIcons[categoryIndex % this._catIcons.length].cls,
+                cardClass:   `cat-card cat-accent-${categoryIndex % this._catIcons.length}`,
                 description: 'Assess knowledge and skills across this subject area.'
             }));
         } else if (error) {
-            console.error(error);
+            const message = error.body?.message || error.message || 'Assessment categories could not be loaded.';
+            if (message.toLowerCase().includes('team member') && message.toLowerCase().includes('files and assignments')) {
+                this.categoryAccessWarning = message;
+                this.categories = [];
+            } else {
+                this.categoryAccessWarning = undefined;
+                this.showToast('Error', message, 'error');
+            }
         }
     }
 
@@ -216,16 +228,27 @@ export default class AssignmentEngine extends LightningElement {
     loadAssignments() {
         return getAssignmentsForCategory({ categoryId: this.selectedCategoryId })
             .then(result => {
-                this.assignments = result.map(asm => ({
-                    ...asm,
-                    isEligibleStatus:  asm.status === 'Eligible',
-                    isCompletedStatus: asm.status === 'Completed',
-                    isLockedStatus:    asm.status === 'Locked'
+                this.assignments = result.map(assignment => ({
+                    ...assignment,
+                    isEligibleStatus:  assignment.status === 'Eligible',
+                    isCompletedStatus: assignment.status === 'Completed',
+                    isLockedStatus:    assignment.status === 'Locked',
+                    isRequestAccessStatus: assignment.isRequestAccessStatus === true,
+                    accessRequestButtonLabel: assignment.accessRequestAlreadySubmitted
+                        ? (assignment.accessRequestCanNotifyAgain ? 'Notify mentor again' : 'Request submitted')
+                        : 'Request access from Mentor',
+                    accessRequestButtonDisabled: assignment.accessRequestAlreadySubmitted &&
+                        !assignment.accessRequestCanNotifyAgain ||
+                        assignment.Id === this.assignmentAccessRequestId,
+                    isAccessRequestSubmitting: assignment.Id === this.assignmentAccessRequestId
                 }));
             })
             .catch(error => {
-                console.error(error);
-                this.showToast('Error', 'Could not load assignments. Please try again.', 'error');
+                this.showToast(
+                    'Error',
+                    error.body?.message || 'Could not load assignments. Please try again.',
+                    'error'
+                );
             });
     }
     
@@ -245,14 +268,72 @@ export default class AssignmentEngine extends LightningElement {
             });
     }
 
+    async handleRequestAssignmentAccess(event) {
+        const assignmentId = event.currentTarget.dataset.id;
+        if (!assignmentId || this.assignmentAccessRequestId) {
+            return;
+        }
+
+        this.assignmentAccessRequestId = assignmentId;
+        this.assignments = this.assignments.map(assignment => assignment.Id === assignmentId
+            ? {
+                ...assignment,
+                isAccessRequestSubmitting: true,
+                accessRequestButtonDisabled: true,
+                accessRequestButtonLabel: 'Sending request...'
+            }
+            : assignment);
+        try {
+            const result = await requestNextAssignmentAccess({ assignmentId });
+            this.assignments = this.assignments.map(assignment => {
+                if (assignment.Id !== assignmentId) {
+                    return assignment;
+                }
+                const wasAlreadyRequested = result.alreadyRequested === true;
+                const canNotifyAgain = result.canNotifyAgain === true;
+                return {
+                    ...assignment,
+                    isAccessRequestSubmitting: false,
+                    accessRequestAlreadySubmitted: true,
+                    accessRequestCanNotifyAgain: canNotifyAgain,
+                    accessRequestButtonLabel: canNotifyAgain
+                        ? (wasAlreadyRequested ? 'Reminder sent' : 'Request sent')
+                        : 'Request submitted',
+                    accessRequestButtonDisabled: !canNotifyAgain
+                };
+            });
+            this.showToast(
+                result.alreadyRequested ? 'Mentor Notified' : 'Request Sent',
+                result.message,
+                'success'
+            );
+        } catch (error) {
+            this.showToast(
+                'Request Failed',
+                error.body?.message || 'Unable to request assignment access.',
+                'error'
+            );
+        } finally {
+            this.assignmentAccessRequestId = undefined;
+            this.assignments = this.assignments.map(assignment => assignment.Id === assignmentId
+                ? {
+                    ...assignment,
+                    isAccessRequestSubmitting: false,
+                    accessRequestButtonDisabled: assignment.accessRequestAlreadySubmitted &&
+                        !assignment.accessRequestCanNotifyAgain
+                }
+                : assignment);
+        }
+    }
+
     handleAssignmentClick(event) {
-        const asmId = event.target.dataset.id;
-        const asm = this.assignments.find(a => a.Id === asmId);
-        if (!asm || !asm.isEligibleStatus) {
+        const assignmentId = event.target.dataset.id;
+        const selectedAssignment = this.assignments.find(assignment => assignment.Id === assignmentId);
+        if (!selectedAssignment || !selectedAssignment.isEligibleStatus) {
             this.handleRefreshAssignments(); // silent — no toast, just resync the list
             return;
         }
-        this.selectedAssignmentId = asmId;
+        this.selectedAssignmentId = assignmentId;
         this.selectedAssignmentTitle = event.target.dataset.title;
 
         this.tabSwitchCount = 0;
@@ -271,7 +352,9 @@ export default class AssignmentEngine extends LightningElement {
                 this.startCountdown();
                 this.persistState();
             })
-            .catch(error => console.error(error));
+            .catch(() => {
+                this.showToast('Error', 'Questions could not be loaded for this assessment.', 'error');
+            });
     }
 
     startCountdown() {
@@ -305,7 +388,7 @@ export default class AssignmentEngine extends LightningElement {
         this.persistState();
     }
     
-    navBackFromInstructions() {
+    navigateBackFromInstructions() {
         if (this.countdownIntervalId) {
             clearInterval(this.countdownIntervalId);
             this.countdownIntervalId = null;
@@ -322,31 +405,31 @@ export default class AssignmentEngine extends LightningElement {
 
         return getSubmissionAttempts({ assignmentId: this.selectedAssignmentId })
         .then(result => {
-            this.attempts = result.map(a => {
-                const isPass = a.Pass_Fail_Status__c === 'Pass';
-                const isGraded = a.Status__c === 'Graded';
+            this.attempts = result.map(attempt => {
+                const isPass = attempt.Pass_Fail_Status__c === 'Pass';
+                const isGraded = attempt.Status__c === 'Graded';
 
                 // Determine the badge look based on whether it's graded or pending
-                let badgeLabel = a.Status__c || 'Pending';
+                let badgeLabel = attempt.Status__c || 'Pending';
                 let badgeClass = 'status-badge badge-pending';
 
                 if (isGraded) {
                     badgeLabel = isPass ? 'Pass' : 'Fail';
                     badgeClass = isPass ? 'status-badge badge-pass' : 'status-badge badge-fail';
                 }
-                if(a.Is_Locked__c){
+                if (attempt.Is_Locked__c) {
                     badgeLabel = 'Fail';
                     badgeClass = 'status-badge badge-fail';
 
                 }
 
                 return {
-                    ...a,
-                    scoreLabel: `${a.Score_Received__c || 0} / ${a.Max_Score__c || 0}`,
+                    ...attempt,
+                    scoreLabel: `${attempt.Score_Received__c || 0} / ${attempt.Max_Score__c || 0}`,
                     passFailLabel: badgeLabel,
                     passFailClass: badgeClass,
-                    isLocked: a.Is_Locked__c,
-                    lockReason: a.Lock_Reason__c
+                    isLocked: attempt.Is_Locked__c,
+                    lockReason: attempt.Lock_Reason__c
                 };
             });
             
@@ -354,7 +437,9 @@ export default class AssignmentEngine extends LightningElement {
             this.showAttemptsScreen   = true;
             this.persistState();
         })
-        .catch(error => console.error(error));
+        .catch(() => {
+            this.showToast('Error', 'Assessment attempts could not be loaded.', 'error');
+        });
     }
 
     // Attempt row click → read-only question/answer/score view
@@ -372,7 +457,9 @@ export default class AssignmentEngine extends LightningElement {
                 this.showAttemptsScreen = false;
                 this.showReviewScreen   = true;
             })
-            .catch(error => console.error(error));
+            .catch(() => {
+                this.showToast('Error', 'Assessment responses could not be loaded.', 'error');
+            });
     }
 
     handleTextChange(event) {
@@ -387,11 +474,11 @@ export default class AssignmentEngine extends LightningElement {
         }
         this.answersMap = updatedMap;
 
-        this.questions = this.questions.map(q => {
-            if (q.Id === questionId) {
-                return { ...q, isAnswered: answerText.length > 0 };
+        this.questions = this.questions.map(question => {
+            if (question.Id === questionId) {
+                return { ...question, isAnswered: answerText.length > 0 };
             }
-            return q;
+            return question;
         });
 
         this.persistState();
@@ -474,10 +561,12 @@ export default class AssignmentEngine extends LightningElement {
     get paginatedQuestions() {
         const start = (this.currentQuestionPage - 1) * this.questionPageSize;
         const end   = start + this.questionPageSize;
-        return this.questions.slice(start, end).map(q => ({
-            ...q,
-            savedAnswer: this.answersMap[q.Id] || '',
-            statusDotClass: this.answersMap[q.Id] ? 'status-dot status-dot-done' : 'status-dot status-dot-pending'
+        return this.questions.slice(start, end).map(question => ({
+            ...question,
+            savedAnswer: this.answersMap[question.Id] || '',
+            statusDotClass: this.answersMap[question.Id]
+                ? 'status-dot status-dot-done'
+                : 'status-dot status-dot-pending'
         }));
     }
 
@@ -508,7 +597,7 @@ export default class AssignmentEngine extends LightningElement {
     }
 
     // ─── Navigation ─────────────────────────────────────────────────────
-    navBackToCategories() {
+    navigateBackToCategories() {
         this.showAssignmentScreen = false;
         this.showCategoryScreen   = true;
         this.clearPersistedState();
@@ -518,7 +607,7 @@ export default class AssignmentEngine extends LightningElement {
         this.showExitConfirmation = true;
     }
 
-    navBackToAssignments() {
+    navigateBackToAssignments() {
         this.showQuestionFeedbackModal = false;
         this.showQuestionScreen = false;
         this.showAttemptsScreen = false;
@@ -562,7 +651,7 @@ export default class AssignmentEngine extends LightningElement {
             });
     }
 
-    navBackToAttempts() {
+    navigateBackToAttempts() {
         this.showQuestionFeedbackModal = false;
         this.showReviewScreen   = false;
         this.showAttemptsScreen = true;
@@ -630,8 +719,10 @@ export default class AssignmentEngine extends LightningElement {
     // in this.assignments. Leave that field blank/0 on the record for an
     // untimed assignment.
     startQuizTimer() {
-        const asm = this.assignments.find(a => a.Id === this.selectedAssignmentId);
-        const minutes = asm ? asm.Time_Limit_Minutes__c : null;
+        const selectedAssignment = this.assignments.find(
+            assignment => assignment.Id === this.selectedAssignmentId
+        );
+        const minutes = selectedAssignment ? selectedAssignment.Time_Limit_Minutes__c : null;
         this.selectedAssignmentTimeLimit = minutes;
 
         if (!minutes || minutes <= 0) {
@@ -650,8 +741,10 @@ export default class AssignmentEngine extends LightningElement {
         if (!this.quizEndTimestamp) {
             return;
         }
-        const asm = this.assignments.find(a => a.Id === this.selectedAssignmentId);
-        this.selectedAssignmentTimeLimit = asm ? asm.Time_Limit_Minutes__c : null;
+        const selectedAssignment = this.assignments.find(
+            assignment => assignment.Id === this.selectedAssignmentId
+        );
+        this.selectedAssignmentTimeLimit = selectedAssignment ? selectedAssignment.Time_Limit_Minutes__c : null;
         this.runQuizTimer();
     }
 
@@ -704,9 +797,9 @@ export default class AssignmentEngine extends LightningElement {
 
     get timerDisplay() {
         if (this.remainingSeconds == null) return '';
-        const m = Math.floor(this.remainingSeconds / 60);
-        const s = this.remainingSeconds % 60;
-        return `${m}:${s < 10 ? '0' : ''}${s}`;
+        const minutes = Math.floor(this.remainingSeconds / 60);
+        const seconds = this.remainingSeconds % 60;
+        return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
     }
 
     get timerClass() {
@@ -844,7 +937,7 @@ export default class AssignmentEngine extends LightningElement {
     // ─── Per-question feedback ────────────────────────────────────────────
     handleQuestionFeedbackIconClick(event) {
         const questionId = event.currentTarget.dataset.id;
-        const question = this.questions.find((q) => q.Id === questionId);
+        const question = this.questions.find((candidateQuestion) => candidateQuestion.Id === questionId);
         this.feedbackQuestionId = questionId;
         this.feedbackQuestionText = question ? question.Question_Text__c : '';
         this.feedbackQuestionComment = '';
@@ -931,16 +1024,16 @@ export default class AssignmentEngine extends LightningElement {
         };
 
         try {
-            sessionStorage.setItem(STATE_KEY, JSON.stringify(state));
-        } catch (e) {
+            sessionStorage.setItem(ASSIGNMENT_ENGINE_STATE_KEY, JSON.stringify(state));
+        } catch {
             // sessionStorage unavailable (private browsing, etc.) - fail silently, refresh just falls back to home
         }
     }
 
     clearPersistedState() {
         try {
-            sessionStorage.removeItem(STATE_KEY);
-        } catch (e) {
+            sessionStorage.removeItem(ASSIGNMENT_ENGINE_STATE_KEY);
+        } catch {
             // ignore
         }
     }
@@ -948,8 +1041,8 @@ export default class AssignmentEngine extends LightningElement {
     restoreState() {
         let raw;
         try {
-            raw = sessionStorage.getItem(STATE_KEY);
-        } catch (e) {
+            raw = sessionStorage.getItem(ASSIGNMENT_ENGINE_STATE_KEY);
+        } catch {
             return false;
         }
         if (!raw) return false;
@@ -957,7 +1050,7 @@ export default class AssignmentEngine extends LightningElement {
         let state;
         try {
             state = JSON.parse(raw);
-        } catch (e) {
+        } catch {
             return false;
         }
         if (!state || !state.screen || state.screen === 'category' || !state.selectedCategoryId) {
@@ -998,10 +1091,10 @@ export default class AssignmentEngine extends LightningElement {
                 if ((state.screen === 'instructions' || state.screen === 'question') && this.selectedAssignmentId) {
                     getAssignmentQuestions({ assignmentId: this.selectedAssignmentId })
                         .then(result => {
-                            this.questions = result.map((q, idx) => ({
-                                ...q,
-                                displayIndex: idx + 1,
-                                isAnswered: !!this.answersMap[q.Id]
+                            this.questions = result.map((question, questionIndex) => ({
+                                ...question,
+                                displayIndex: questionIndex + 1,
+                                isAnswered: !!this.answersMap[question.Id]
                             }));
                             this.showCategoryScreen = false;
 
@@ -1014,7 +1107,11 @@ export default class AssignmentEngine extends LightningElement {
                             }
                         })
                         .catch(error => {
-                            console.error(error);
+                            this.showToast(
+                                'Error',
+                                error.body?.message || 'Your saved assessment could not be restored.',
+                                'error'
+                            );
                             return false;
                         })
                         .finally(() => {
@@ -1041,7 +1138,7 @@ export default class AssignmentEngine extends LightningElement {
             return;
         }
 
-        const savedStateRaw = sessionStorage.getItem(STATE_KEY);
+        const savedStateRaw = sessionStorage.getItem(ASSIGNMENT_ENGINE_STATE_KEY);
         const savedState = savedStateRaw ? JSON.parse(savedStateRaw) : null;
         const isQuizActive = this.showQuestionScreen || (savedState && savedState.screen === 'question');
         if (!isQuizActive) {
@@ -1054,12 +1151,14 @@ export default class AssignmentEngine extends LightningElement {
             return;
         }
 
-        const navTarget = path.find(el => {
-            if (!el || !el.tagName) return false;
-            const tag = el.tagName.toUpperCase();
+        const navTarget = path.find(pathElement => {
+            if (!pathElement || !pathElement.tagName) return false;
+            const tag = pathElement.tagName.toUpperCase();
             const isAnchor = tag === 'A';
-            const isKnownNavComponent = NAV_COMPONENT_MATCHERS.some(m => tag.includes(m));
-            const href = el.getAttribute ? (el.getAttribute('href') || '') : '';
+            const isKnownNavComponent = NAV_COMPONENT_MATCHERS.some(
+                (componentMatcher) => tag.includes(componentMatcher)
+            );
+            const href = pathElement.getAttribute ? (pathElement.getAttribute('href') || '') : '';
             return isAnchor || isKnownNavComponent || (href.length > 0 && !href.startsWith('javascript:'));
         });
 

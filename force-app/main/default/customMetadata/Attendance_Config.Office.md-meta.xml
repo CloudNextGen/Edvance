@@ -7,6 +7,9 @@
         <value xsi:type="xsd:double">15.0</value>
     </values>
     <values>
+        <field>HR_Email__c</field>
+    </values>
+    <values>
         <field>Latitude__c</field>
         <value xsi:type="xsd:double">27.4943323</value>
     </values>
@@ -17,6 +20,12 @@
     <values>
         <field>Lunch_Duration_Minutes__c</field>
         <value xsi:type="xsd:double">50.0</value>
+    </values>
+    <values>
+        <field>Manager_Email__c</field>
+    </values>
+    <values>
+        <field>Mentor_Email__c</field>
     </values>
     <values>
         <field>Need_Lunch_Photo__c</field>

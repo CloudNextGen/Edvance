@@ -9,7 +9,6 @@
         <members>AttendanceAdminController</members>
         <members>AttendanceController</members>
         <members>AttendanceDeductionController</members>
-        <members>Attendancegeoutils</members>
         <members>EmailEventPublisher</members>
         <members>ErrorLogger</members>
         <members>GradeSubmissionService</members>
@@ -17,9 +16,6 @@
         <members>LearningAccessAdminController</members>
         <members>LearningContentController</members>
         <members>LearningContentControllerTest</members>
-        <members>OneDriveIntegrationService</members>
-        <members>OneDriveIntegrationServicesTest</members>
-        <members>OneDriveLearningSyncService</members>
         <members>PortalHomeController</members>
         <members>PortalRequestService</members>
         <members>MonthlyAttendanceSummaryBatch</members>
@@ -27,6 +23,8 @@
         <members>DriveBrowserControllerTest</members>
         <members>InstructionController</members>
         <members>CreateCommunityUserFromFlow</members>
+        <members>PortalNotificationRouterController</members>
+        <members>PortalRequestMentorAccess</members>
         <name>ApexClass</name>
     </types>
     <types>
@@ -66,6 +64,7 @@
         <members>Assessment_Portal_Config__mdt.Auto_Assign_Next_File__c</members>
         <members>Assessment_Portal_Config__mdt.Auto_Assign_Next_Folder__c</members>
         <members>Assessment_Portal_Config__mdt.Exclude_Saturday__c</members>
+        <members>Assessment_Portal_Config__mdt.Enforce_Team_Member_Access_Window__c</members>
         <members>Assignment_Eligibility__c.Assignment__c</members>
         <members>Assignment_Eligibility__c.Contact__c</members>
         <members>Assignment_Eligibility__c.Current_Attempt_Number__c</members>
@@ -87,6 +86,9 @@
         <members>Attendance_Config__mdt.Need_Lunch_Photo__c</members>
         <members>Attendance_Config__mdt.Office_Name__c</members>
         <members>Attendance_Config__mdt.Office_Start_Time__c</members>
+        <members>Attendance_Config__mdt.HR_Email__c</members>
+        <members>Attendance_Config__mdt.Manager_Email__c</members>
+        <members>Attendance_Config__mdt.Mentor_Email__c</members>
         <members>Attendance_Log__c.Accuracy_Meters__c</members>
         <members>Attendance_Log__c.Appeal_Submitted__c</members>
         <members>Attendance_Log__c.Attendance_Summary__c</members>
@@ -329,6 +331,7 @@
         <members>myRequests</members>
         <members>portalHome</members>
         <members>topDeductions</members>
+        <members>notificationRecordRouter</members>
         <name>LightningComponentBundle</name>
     </types>
     <types>
@@ -377,6 +380,10 @@
         <members>Hero2_SVG</members>
         <members>Hero_SVG</members>
         <name>StaticResource</name>
+    </types>
+    <types>
+        <members>Attendance_Deduction_Refresh</members>
+        <name>LightningMessageChannel</name>
     </types>
     <version>67.0</version>
 </Package>

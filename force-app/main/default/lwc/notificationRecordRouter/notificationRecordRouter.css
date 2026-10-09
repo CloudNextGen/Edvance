@@ -1,0 +1,14 @@
+.router-message {
+    min-height: 6rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2.5rem;
+    color: #5c6285;
+    font-size: 0.9rem;
+}
+
+.router-error {
+    color: #ba0517;
+    text-align: center;
+}

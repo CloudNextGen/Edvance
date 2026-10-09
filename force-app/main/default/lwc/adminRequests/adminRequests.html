@@ -14,9 +14,14 @@
                     <p class="subtitle">Showing requests from queues you belong to</p>
                 </div>
                 <div class="header-actions">
-                    <button class="secondary-btn refresh-btn" onclick={handleRefresh} disabled={isRefreshing}>
-                        <template if:false={isRefreshing}>↻ Refresh</template>
-                        <template if:true={isRefreshing}>Refreshing...</template>
+                    <button class="secondary-btn refresh-btn" onclick={handleRefresh} disabled={isRefreshing}
+                        aria-label="Refresh requests" title="Refresh requests">
+                        <template if:true={isRefreshing}>
+                            <span class="refresh-spinner" aria-hidden="true"></span>
+                        </template>
+                        <template if:false={isRefreshing}>
+                            <span class="refresh-icon" aria-hidden="true">↻</span>
+                        </template>
                     </button>
                     <div class="stats-wrap">
                         <button 

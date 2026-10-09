@@ -97,6 +97,7 @@ private class LearningContentControllerTest {
             // Custom Notification Type is metadata and is not created here.
             Group queue = new Group(Name = 'Learning File Review Queue',Type = 'Queue');
             insert queue;
+            insert new QueueSobject(QueueId = queue.Id, SobjectType = 'Case');
 
             try {
                 insert new QueueSobject(QueueId = queue.Id, SobjectType = 'Task');
@@ -117,7 +118,7 @@ private class LearningContentControllerTest {
     }
 
     private static User getAdminUser() {
-        return [SELECT Id FROM User WHERE Username = :adminUsername() LIMIT 1];
+        return [SELECT Id, UserRoleId FROM User WHERE Username = :adminUsername() LIMIT 1];
     }
 
     private static User getPortalUserOrNull() {
@@ -167,7 +168,6 @@ private class LearningContentControllerTest {
     static void testGetLearningContentTree_LearnerSeesOnlyGrantedFiles() {
         User portalUser = getPortalUserOrNull();
         if (portalUser == null) {
-            System.debug('Skipping: no community/portal profile available in this org — see class header.');
             return;
         }
 
@@ -222,7 +222,6 @@ private class LearningContentControllerTest {
     static void testMarkFileComplete_UnlocksNextFileInSameFolder() {
         User portalUser = getPortalUserOrNull();
         if (portalUser == null) {
-            System.debug('Skipping: no community/portal profile available in this org.');
             return;
         }
 
@@ -259,7 +258,6 @@ private class LearningContentControllerTest {
     static void testMarkFileComplete_DoesNotUnlockNextFileWhenDisabled() {
         User portalUser = getPortalUserOrNull();
         if (portalUser == null) {
-            System.debug('Skipping: no community/portal profile available in this org.');
             return;
         }
 
@@ -293,7 +291,6 @@ private class LearningContentControllerTest {
     static void testMarkFileComplete_LastFileInFolderUnlocksNextFolder() {
         User portalUser = getPortalUserOrNull();
         if (portalUser == null) {
-            System.debug('Skipping: no community/portal profile available in this org.');
             return;
         }
 
@@ -333,7 +330,6 @@ private class LearningContentControllerTest {
     static void testMarkFileComplete_DoesNotUnlockNextFolderWhenFolderAssignmentDisabled() {
         User portalUser = getPortalUserOrNull();
         if (portalUser == null) {
-            System.debug('Skipping: no community/portal profile available in this org.');
             return;
         }
 
@@ -374,7 +370,6 @@ private class LearningContentControllerTest {
     static void testMarkFileComplete_LastFolderInTreeHasNoNext() {
         User portalUser = getPortalUserOrNull();
         if (portalUser == null) {
-            System.debug('Skipping: no community/portal profile available in this org.');
             return;
         }
 
@@ -403,7 +398,6 @@ private class LearningContentControllerTest {
     static void testMarkFileComplete_BlankFileIdThrows() {
         User portalUser = getPortalUserOrNull();
         if (portalUser == null) {
-            System.debug('Skipping: no community/portal profile available in this org.');
             return;
         }
 
@@ -422,7 +416,6 @@ private class LearningContentControllerTest {
     static void testMarkFileComplete_UnknownFileIdThrows() {
         User portalUser = getPortalUserOrNull();
         if (portalUser == null) {
-            System.debug('Skipping: no community/portal profile available in this org.');
             return;
         }
 
@@ -511,43 +504,42 @@ private class LearningContentControllerTest {
     }
 
     @isTest
-    static void testDebugNextContentFolder_ReturnsNextFolderAndFile() {
+    static void testNextContentFolderDiagnostics_ReturnsNextFolderAndFile() {
         Learning_Folder__c rootA = getFolderByName('Root A');
         Learning_Folder__c rootB = getFolderByName('Root B');
         Learning_File__c fileB1 = getFileByName('B1 - Overview');
 
-        Map<String, Object> result;
+        Map<String, Object> nextFolderDiagnostics;
         System.runAs(getAdminUser()) {
             Test.startTest();
-            result = LearningContentController.debugNextContentFolder(rootA.Id);
+            nextFolderDiagnostics = LearningContentController.getNextContentFolderDiagnostics(rootA.Id);
             Test.stopTest();
         }
 
-        System.assertEquals(String.valueOf(rootB.Id), (String) result.get('nextFolderId'));
-        System.assertEquals(String.valueOf(fileB1.Id), (String) result.get('nextFileId'));
-        System.assertEquals(fileB1.Name, (String) result.get('nextFileName'));
+        System.assertEquals(String.valueOf(rootB.Id), (String) nextFolderDiagnostics.get('nextFolderId'));
+        System.assertEquals(String.valueOf(fileB1.Id), (String) nextFolderDiagnostics.get('nextFileId'));
+        System.assertEquals(fileB1.Name, (String) nextFolderDiagnostics.get('nextFileName'));
     }
 
    @isTest
-    static void testDebugNextContentFolder_LastFolderReturnsNulls() {
+    static void testNextContentFolderDiagnostics_LastFolderReturnsNulls() {
         Learning_Folder__c rootB = getFolderByName('Root B');
 
-        Map<String, Object> result;
+        Map<String, Object> nextFolderDiagnostics;
         System.runAs(getAdminUser()) {
             Test.startTest();
-            result = LearningContentController.debugNextContentFolder(rootB.Id);
+            nextFolderDiagnostics = LearningContentController.getNextContentFolderDiagnostics(rootB.Id);
             Test.stopTest();
         }
 
-        System.assertEquals(null, result.get('nextFolderId'));
-        System.assertEquals(null, result.get('nextFileId'));
+        System.assertEquals(null, nextFolderDiagnostics.get('nextFolderId'));
+        System.assertEquals(null, nextFolderDiagnostics.get('nextFileId'));
     }
 
     @isTest
     static void testRecordFileOpened_CreatesAccessAndStampsTimestamp() {
         User portalUser = getPortalUserOrNull();
         if (portalUser == null) {
-            System.debug('Skipping: no community/portal profile available in this org.');
             return;
         }
 
@@ -573,7 +565,6 @@ private class LearningContentControllerTest {
     static void testRecordFileOpened_DoesNotOverwriteExistingTimestamp() {
         User portalUser = getPortalUserOrNull();
         if (portalUser == null) {
-            System.debug('Skipping: no community/portal profile available in this org.');
             return;
         }
 
@@ -675,5 +666,301 @@ private class LearningContentControllerTest {
             }
         }
         System.assert(threw, 'Blank file Id should raise an AuraHandledException');
+    }
+
+    @isTest
+    static void testRequestNextContentAccess_AssignsMentorAndPreventsDuplicates() {
+        User portalUser = getPortalUserOrNull();
+        if (portalUser == null) {
+            return;
+        }
+
+        User mentor = getAdminUser();
+        Contact learner = [
+            SELECT Id, Name
+            FROM Contact
+            WHERE LastName = 'Learner' AND FirstName = 'LCC'
+            LIMIT 1
+        ];
+        learner.Mentor__c = mentor.Id;
+        update learner;
+        Learning_Folder__c folder = getFolderByName('Root A');
+
+        Map<String, Object> firstRequest;
+        Map<String, Object> duplicateRequest;
+        Map<String, Object> requestStatusBefore;
+        Map<String, Object> requestStatusAfter;
+        Boolean requestExistsBefore;
+        Boolean requestExistsAfter;
+        System.runAs(portalUser) {
+            Test.startTest();
+            requestStatusBefore = LearningContentController.getNextContentAccessRequestStatus(folder.Id);
+            requestExistsBefore = LearningContentController.hasRequestedNextContentAccess(folder.Id);
+            firstRequest = LearningContentController.requestNextContentAccess(folder.Id);
+            requestStatusAfter = LearningContentController.getNextContentAccessRequestStatus(folder.Id);
+            requestExistsAfter = LearningContentController.hasRequestedNextContentAccess(folder.Id);
+            duplicateRequest = LearningContentController.requestNextContentAccess(folder.Id);
+            Test.stopTest();
+        }
+
+        System.assertEquals(true, requestStatusBefore.get('available'));
+        System.assertEquals(false, requestStatusBefore.get('alreadyRequested'));
+        System.assertEquals(false, requestExistsBefore);
+        System.assertEquals(true, firstRequest.get('success'));
+        System.assertEquals(false, firstRequest.get('alreadyRequested'));
+        System.assert(
+            String.valueOf(firstRequest.get('message')).contains('email'),
+            'The learner should be told when the mentor email notification was submitted.'
+        );
+        System.assertEquals(true, requestStatusAfter.get('available'));
+        System.assertEquals(true, requestStatusAfter.get('alreadyRequested'));
+        System.assertEquals('New', requestStatusAfter.get('requestStatus'));
+        System.assertEquals(true, requestStatusAfter.get('canNotifyAgain'));
+        System.assertEquals(true, requestExistsAfter);
+        System.assertEquals(true, duplicateRequest.get('alreadyRequested'));
+        System.assert(
+            String.valueOf(duplicateRequest.get('message')).contains('email'),
+            'An existing open request should be able to notify the mentor again by email.'
+        );
+        System.assertEquals(firstRequest.get('caseId'), duplicateRequest.get('caseId'));
+
+        Id requestId = (Id) firstRequest.get('caseId');
+        update new Case(Id = requestId, Status = 'Working');
+        System.runAs(portalUser) {
+            requestStatusAfter =
+                LearningContentController.getNextContentAccessRequestStatus(folder.Id);
+            duplicateRequest = LearningContentController.requestNextContentAccess(folder.Id);
+        }
+        System.assertEquals('Working', requestStatusAfter.get('requestStatus'));
+        System.assertEquals(false, requestStatusAfter.get('canNotifyAgain'));
+        System.assertEquals(false, duplicateRequest.get('canNotifyAgain'));
+
+        update new Case(Id = requestId, Status = 'Closed');
+        System.runAs(portalUser) {
+            requestStatusAfter =
+                LearningContentController.getNextContentAccessRequestStatus(folder.Id);
+            System.assertEquals('Closed', requestStatusAfter.get('requestStatus'));
+            System.assertEquals(false, requestStatusAfter.get('canNotifyAgain'));
+            duplicateRequest = LearningContentController.requestNextContentAccess(folder.Id);
+            System.assertEquals(
+                true,
+                LearningContentController.hasRequestedNextContentAccess(folder.Id),
+                'The same locked file must remain marked requested even after its Case is closed.'
+            );
+            duplicateRequest = LearningContentController.requestNextContentAccess(folder.Id);
+        }
+        System.assertEquals(true, duplicateRequest.get('alreadyRequested'), 'Closed requests must not be resubmitted.');
+        System.assertEquals(false, duplicateRequest.get('canNotifyAgain'));
+
+        Learning_File__c firstFile = getFileByName('A1 - Intro');
+        insert new Learning_Access__c(
+            Name = firstFile.Name + ' - ' + learner.Name,
+            Contact__c = learner.Id,
+            Learning_File__c = firstFile.Id,
+            Access_Status__c = 'Granted',
+            Completion_Status__c = 'Not Started',
+            Granted_Date__c = System.now()
+        );
+        System.runAs(portalUser) {
+            System.assertEquals(
+                false,
+                LearningContentController.hasRequestedNextContentAccess(folder.Id),
+                'Once the requested file is granted, the next locked file must be requestable.'
+            );
+            duplicateRequest = LearningContentController.requestNextContentAccess(folder.Id);
+        }
+        System.assertEquals(false, duplicateRequest.get('alreadyRequested'));
+        System.assertNotEquals(requestId, (Id) duplicateRequest.get('caseId'));
+        Map<String, Object> secondDuplicate;
+        System.runAs(portalUser) {
+            secondDuplicate = LearningContentController.requestNextContentAccess(folder.Id);
+        }
+        System.assertEquals(true, secondDuplicate.get('alreadyRequested'));
+        System.assertEquals(duplicateRequest.get('caseId'), secondDuplicate.get('caseId'));
+
+        Learning_File__c secondFile = getFileByName('A2 - Deep Dive');
+        insert new Learning_Access__c(
+            Name = secondFile.Name + ' - ' + learner.Name,
+            Contact__c = learner.Id,
+            Learning_File__c = secondFile.Id,
+            Access_Status__c = 'Granted',
+            Completion_Status__c = 'Completed',
+            Granted_Date__c = System.now()
+        );
+        Map<String, Object> nextFolderRequest;
+        System.runAs(portalUser) {
+            System.assertEquals(
+                false,
+                LearningContentController.hasRequestedNextContentAccess(folder.Id),
+                'After all files in the current folder are granted, the next folder file should be requestable.'
+            );
+            nextFolderRequest = LearningContentController.requestNextContentAccess(folder.Id);
+        }
+        System.assertEquals(false, nextFolderRequest.get('alreadyRequested'));
+        Id nextFolderRequestId = (Id) nextFolderRequest.get('caseId');
+        Case nextFolderAccessCase = [
+            SELECT Subject
+            FROM Case
+            WHERE Id = :nextFolderRequestId
+        ];
+        System.assert(
+            nextFolderAccessCase.Subject.contains('B1 - Overview'),
+            'The request should target the first locked file in the next folder.'
+        );
+
+        Case request = [
+            SELECT ContactId, OwnerId, Subject, Type, Status, Description
+            FROM Case
+            WHERE Id = :requestId
+        ];
+        Id reviewQueueId = [
+            SELECT Id
+            FROM Group
+            WHERE Type = 'Queue'
+              AND DeveloperName = 'Learning_File_Review_Queue'
+            LIMIT 1
+        ].Id;
+        System.assertEquals(learner.Id, request.ContactId);
+        System.assertEquals(reviewQueueId, request.OwnerId);
+        System.assertEquals('Other', request.Type);
+        System.assertEquals('Closed', request.Status);
+        System.assert(request.Description.contains(firstFile.Name));
+    }
+
+    @isTest
+    static void testRequestNextContentAccess_RequiresAssignedMentor() {
+        User portalUser = getPortalUserOrNull();
+        if (portalUser == null) {
+            return;
+        }
+
+        Contact learner = [
+            SELECT Id, Mentor__c
+            FROM Contact
+            WHERE LastName = 'Learner' AND FirstName = 'LCC'
+            LIMIT 1
+        ];
+        learner.Mentor__c = null;
+        update learner;
+
+        Boolean threw = false;
+        System.runAs(portalUser) {
+            try {
+                LearningContentController.requestNextContentAccess(UserInfo.getUserId());
+            } catch (AuraHandledException ex) {
+                threw = true;
+            }
+        }
+
+        System.assert(
+            threw,
+            'An email match must not substitute for an active, permissioned mentor selected on the learner Contact.'
+        );
+        System.assertEquals(
+            0,
+            [SELECT COUNT() FROM Case WHERE ContactId = :learner.Id AND Type = 'Other'],
+            'The request should not be created when no eligible mentor is selected.'
+        );
+    }
+
+    @isTest
+    static void testFileAccessRequestUnavailableWhenAutoEligibilityEnabled() {
+        User portalUser = getPortalUserOrNull();
+        if (portalUser == null) {
+            return;
+        }
+        Learning_Folder__c folder = getFolderByName('Root A');
+        Map<String, Object> requestStatus;
+        Boolean requestThrew = false;
+
+        LearningContentController.autoCreateAssignmentEligibilityOverride = true;
+        System.runAs(portalUser) {
+            requestStatus = LearningContentController.getNextContentAccessRequestStatus(folder.Id);
+            try {
+                LearningContentController.requestNextContentAccess(folder.Id);
+            } catch (AuraHandledException ex) {
+                requestThrew = true;
+            }
+        }
+        LearningContentController.autoCreateAssignmentEligibilityOverride = null;
+
+        System.assertEquals(false, requestStatus.get('available'));
+        System.assertEquals(false, requestStatus.get('alreadyRequested'));
+        System.assertEquals(true, requestThrew, 'Direct request submission must be blocked when auto eligibility is enabled.');
+    }
+
+    @isTest
+    static void testRequestNextContentAccess_AcceptsSelectedMentorWithPermission() {
+        User portalUser = getPortalUserOrNull();
+        if (portalUser == null) {
+            return;
+        }
+
+        User adminUser = getAdminUser();
+        Profile mentorProfile = [
+            SELECT Id
+            FROM Profile
+            WHERE Name = 'Standard User'
+            LIMIT 1
+        ];
+        User mentor = new User(
+            FirstName = 'LCC',
+            LastName = 'Mentor',
+            Alias = 'lccmtr',
+            Email = 'lcc.mentor.' + uniqueSuffix() + '@lcctest.invalid',
+            Username = 'lcc.mentor.' + uniqueSuffix() + '@lcctest.invalid',
+            ProfileId = mentorProfile.Id,
+            UserRoleId = adminUser.UserRoleId,
+            TimeZoneSidKey = 'America/Los_Angeles',
+            LocaleSidKey = 'en_US',
+            EmailEncodingKey = 'UTF-8',
+            LanguageLocaleKey = 'en_US'
+        );
+        PermissionSet mentorPermissionSet = [
+            SELECT Id
+            FROM PermissionSet
+            WHERE Name = 'Portal_Mentor_permission_set'
+            LIMIT 1
+        ];
+        System.runAs(new User(Id = UserInfo.getUserId())) {
+            insert mentor;
+            insert new PermissionSetAssignment(
+                AssigneeId = mentor.Id,
+                PermissionSetId = mentorPermissionSet.Id
+            );
+        }
+
+        Contact learner = [
+            SELECT Id
+            FROM Contact
+            WHERE LastName = 'Learner' AND FirstName = 'LCC'
+            LIMIT 1
+        ];
+        learner.Mentor__c = mentor.Id;
+        update learner;
+
+        Learning_Folder__c folder = getFolderByName('Root A');
+        Map<String, Object> requestResult;
+        System.runAs(portalUser) {
+            requestResult = LearningContentController.requestNextContentAccess(
+                folder.Id
+            );
+        }
+
+        Id requestId = (Id) requestResult.get('caseId');
+        Case request = [
+            SELECT OwnerId
+            FROM Case
+            WHERE Id = :requestId
+        ];
+        Id reviewQueueId = [
+            SELECT Id
+            FROM Group
+            WHERE Type = 'Queue'
+              AND DeveloperName = 'Learning_File_Review_Queue'
+            LIMIT 1
+        ].Id;
+        System.assertEquals(reviewQueueId, request.OwnerId);
+        System.assertEquals(true, requestResult.get('success'));
     }
 }

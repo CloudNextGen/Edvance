@@ -4,7 +4,7 @@
         <!-- ============ HERO ============ -->
         <section class="hero-banner">
             <div class="hero-copy">
-                <p class="hero-eyebrow">Onboarding Portal</p>
+                <p class="hero-eyebrow">Edvance Portal</p>
                 <h1 class="hero-title">{welcomeMessage}</h1>
                 <p class="hero-subtitle">{heroSubtitle}</p>
             </div>
@@ -65,47 +65,32 @@
         </section>
 
         <!-- ============ PROFILE CONTACTS ============ -->
-        <template if:true={isCommunityUser}>
+        <template if:true={showProfileSection}>
             <section class="section-block profile-section">
                 <div class="section-header">
                     <h2 class="section-title">Admin Details</h2>
                 </div>
 
-                <template if:true={isLoadingProfiles}>
-                    <div class="profile-skeleton" aria-live="polite">
-                        <div class="profile-skeleton-card"></div>
-                        <div class="profile-skeleton-card"></div>
-                        <div class="profile-skeleton-card"></div>
-                    </div>
-                </template>
-
-                <template if:false={isLoadingProfiles}>
-                    <template if:true={hasProfileCards}>
-                        <div class="profile-grid">
-                            <template for:each={profileCards} for:item="card">
-                                <article key={card.key} class="profile-card">
-                                    <div class="profile-avatar">{card.profile.profile}</div>
-                                    <div class="profile-content">
-                                        <p class="profile-role">{card.label}</p>
-                                        <h3 class="profile-name">{card.profile.name}</h3>
-                                        <div class="profile-detail">
-                                            <span class="profile-label">Email</span>
-                                            <template if:true={card.profile.email}>
-                                                <lightning-formatted-email value={card.profile.email}></lightning-formatted-email>
-                                            </template>
-                                            <template if:false={card.profile.email}>
-                                                <span class="profile-value muted">Not available</span>
-                                            </template>
-                                        </div>
-                                    </div>
-                                </article>
-                            </template>
-                        </div>
+                <div class="profile-grid">
+                    <template for:each={profileCards} for:item="card">
+                        <article key={card.key} class="profile-card">
+                            <div class="profile-avatar">{card.profile.profile}</div>
+                            <div class="profile-content">
+                                <p class="profile-role">{card.label}</p>
+                                <h3 class="profile-name">{card.profile.name}</h3>
+                                <div class="profile-detail">
+                                    <span class="profile-label">Email</span>
+                                    <template if:true={card.profile.email}>
+                                        <lightning-formatted-email value={card.profile.email}></lightning-formatted-email>
+                                    </template>
+                                    <template if:false={card.profile.email}>
+                                        <span class="profile-value muted">Not available</span>
+                                    </template>
+                                </div>
+                            </div>
+                        </article>
                     </template>
-                    <template if:false={hasProfileCards}>
-                        <p class="empty-state">Profile contact details are not available right now.</p>
-                    </template>
-                </template>
+                </div>
             </section>
         </template>
 
@@ -118,41 +103,27 @@
         </button>
 
         <!-- ============ RECENT ACTIVITY ============ -->
-        <section class="section-block">
-            <h2 class="section-title">Recent Activity</h2>
-
-            <template if:true={isLoadingRecent}>
-                <div class="recent-skeleton">
-                    <div class="skeleton-row"></div>
-                    <div class="skeleton-row"></div>
-                    <div class="skeleton-row"></div>
-                </div>
-            </template>
-
-            <template if:false={isLoadingRecent}>
-                <template if:true={hasRecentFiles}>
-                    <ul class="recent-list">
-                        <template for:each={recentFiles} for:item="file">
-                            <li key={file.id}
-                                class="recent-item"
-                                data-id={file.id}
-                                data-url={file.url}
-                                onclick={handleRecentFileClick}>
-                                <span class="recent-icon">{file.iconLetter}</span>
-                                <span class="recent-meta">
-                                    <span class="recent-name">{file.name}</span>
-                                    <span class="recent-time">{file.relativeTime}</span>
-                                </span>
-                                <span class="recent-arrow">›</span>
-                            </li>
-                        </template>
-                    </ul>
-                </template>
-                <template if:false={hasRecentFiles}>
-                    <p class="empty-state">No recent files yet — open something from Learning Documents to see it here.</p>
-                </template>
-            </template>
-        </section>
+        <template if:true={showRecentSection}>
+            <section class="section-block">
+                <h2 class="section-title">Recent Activity</h2>
+                <ul class="recent-list">
+                    <template for:each={recentFiles} for:item="file">
+                        <li key={file.id}
+                            class="recent-item"
+                            data-id={file.id}
+                            data-url={file.url}
+                            onclick={handleRecentFileClick}>
+                            <span class="recent-icon">{file.iconLetter}</span>
+                            <span class="recent-meta">
+                                <span class="recent-name">{file.name}</span>
+                                <span class="recent-time">{file.relativeTime}</span>
+                            </span>
+                            <span class="recent-arrow">›</span>
+                        </li>
+                    </template>
+                </ul>
+            </section>
+        </template>
         <!-- ============ Deduction UI ============ -->
         <div class="slds-m-vertical_medium">
             <c-top-deductions></c-top-deductions>

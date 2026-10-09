@@ -5,17 +5,18 @@ import submitPunch from '@salesforce/apex/AttendanceController.submitPunch';
 import submitAppeal from '@salesforce/apex/AttendanceController.submitAppeal';
 import getHistory from '@salesforce/apex/AttendanceController.getHistory';
 
+// Lunch Check-In = lunch starts ("Lunch In"), Lunch Check-Out = lunch ends ("Lunch Out")
 const TYPE_LABELS = {
     'Office Check-In': 'Office Check-In',
+    'Lunch Check-In': 'Lunch In',
     'Lunch Check-Out': 'Lunch Out',
-    'Lunch Check-In': 'Back from Lunch',
     'Office Check-Out': 'Office Check-Out'
 };
 
 const TYPE_ICONS = {
     'Office Check-In': 'utility:check',
-    'Lunch Check-Out': 'utility:food_and_drink',
-    'Lunch Check-In': 'utility:logout',
+    'Lunch Check-In': 'utility:food_and_drink',
+    'Lunch Check-Out': 'utility:logout',
     'Office Check-Out': 'utility:logout'
 };
 
@@ -333,6 +334,7 @@ export default class AttendanceCapture extends LightningElement {
                     ? this.record.entries.find((e) => e.type === this.selectedPunchType)
                     : null;
 
+                // No photo required for this punch (e.g. Office Check-Out): submit directly
                 if (entry && entry.needsPhoto === false) {
                     this.doSubmit(null, null);
                     return;
@@ -483,7 +485,7 @@ export default class AttendanceCapture extends LightningElement {
             return;
         }
 
-        const headers = ['Date', 'Office In', 'Office Out', 'Lunch Out', 'Lunch In', 'Office Late', 'Lunch Late', 'Deduction', 'Status'];
+        const headers = ['Date', 'Office In', 'Office Out', 'Lunch In', 'Lunch Out', 'Office Late', 'Lunch Late', 'Deduction', 'Status'];
         const csvRows = [headers.join(',')];
 
         this.historyRows.forEach(row => {
@@ -491,8 +493,8 @@ export default class AttendanceCapture extends LightningElement {
                 `"${row.date || ''}"`,
                 `"${row.officeIn || ''}"`,
                 `"${row.officeOut || ''}"`,
-                `"${row.lunchOut || ''}"`,
                 `"${row.lunchIn || ''}"`,
+                `"${row.lunchOut || ''}"`,
                 `"${row.officeLateMinutes || ''}"`,
                 `"${row.lunchLateMinutes || ''}"`,
                 `"${row.deduction || 0}"`,
@@ -569,8 +571,8 @@ export default class AttendanceCapture extends LightningElement {
             date: this.formatDate(r.Date__c),
             officeIn: this.formatTime(r.Office_Check_In_Time__c),
             officeOut: this.formatTime(r.Office_Check_Out_Time__c),
-            lunchOut: this.formatTime(r.Lunch_Out_Time__c),
             lunchIn: this.formatTime(r.Lunch_In_Time__c),
+            lunchOut: this.formatTime(r.Lunch_Out_Time__c),
             officeLateMinutes: this.formatLateMinutes(r.Office_Late_Minutes__c || 0),
             lunchLateMinutes: this.formatLateMinutes(r.Lunch_Late_Minutes__c || 0),
             deduction,

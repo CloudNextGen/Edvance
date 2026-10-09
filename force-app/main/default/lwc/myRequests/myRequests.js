@@ -94,7 +94,12 @@ export default class MyRequests extends LightningElement {
     }
 
     get isSubmitDisabled() {
-        return this.isSubmitting;
+        return (
+            this.isSubmitting ||
+            !this.formRequestType?.trim() ||
+            !this.formSubject?.trim() ||
+            !this.formDescription?.trim()
+        );
     }
 
     handleRowToggle(event) {
@@ -136,12 +141,24 @@ export default class MyRequests extends LightningElement {
         this.formDescription = event.target.value;
     }
 
+    validateInputs() {
+        const inputFields = [
+            ...this.template.querySelectorAll('lightning-combobox'),
+            ...this.template.querySelectorAll('lightning-input'),
+            ...this.template.querySelectorAll('lightning-textarea')
+        ];
+
+        return inputFields.reduce((validSoFar, inputCmp) => {
+            inputCmp.reportValidity();
+            return validSoFar && inputCmp.checkValidity();
+        }, true);
+    }
+
     async handleRefresh() {
         this.isRefreshing = true;
         try {
             await refreshApex(this.wiredResult);
 
-            // Any expanded rows have their own comment-thread wire — refresh those too.
             const threads = this.template.querySelectorAll('c-case-comment-thread');
             await Promise.all(Array.from(threads).map((t) => t.refresh()));
         } finally {
@@ -152,21 +169,17 @@ export default class MyRequests extends LightningElement {
     async handleSubmit() {
         this.formError = '';
 
-        if (!this.formRequestType) {
-            this.formError = 'Please select a request type.';
-            return;
-        }
-        if (!this.formDescription || !this.formDescription.trim()) {
-            this.formError = 'Please describe your request.';
+        if (!this.validateInputs()) {
+            this.formError = 'Please fill in all required fields.';
             return;
         }
 
         this.isSubmitting = true;
         try {
             const result = await raiseRequest({
-                requestType: this.formRequestType,
-                subject: this.formSubject,
-                description: this.formDescription
+                requestType: this.formRequestType.trim(),
+                subject: this.formSubject.trim(),
+                description: this.formDescription.trim()
             });
 
             this.isModalOpen = false;

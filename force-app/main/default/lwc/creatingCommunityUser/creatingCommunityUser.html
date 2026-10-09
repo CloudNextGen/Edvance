@@ -1,5 +1,5 @@
 <template>
-    <lightning-card title="Create Contact & Community User">
+    <lightning-card title="Create User">
         <div class="slds-p-around_medium">
 
             <!-- First Name -->
@@ -49,7 +49,37 @@
                 required>
             </lightning-record-picker>
 
-            <!-- User Type — Only Mentor & Team Member (No HR) -->
+            <!-- HR Picker (User Lookup) -->
+            <lightning-record-picker
+                label="HR"
+                placeholder="Search HR Users..."
+                object-api-name="User"
+                value={selectedHrId}
+                onchange={handleHrChange}
+                data-field="hrPicker">
+            </lightning-record-picker>
+
+            <!-- Manager Picker (User Lookup) -->
+            <lightning-record-picker
+                label="Manager"
+                placeholder="Search Managers..."
+                object-api-name="User"
+                value={selectedManagerId}
+                onchange={handleManagerChange}
+                data-field="managerPicker">
+            </lightning-record-picker>
+
+            <!-- Mentor Picker (User Lookup) -->
+            <lightning-record-picker
+                label="Mentor"
+                placeholder="Search Mentors..."
+                object-api-name="User"
+                value={selectedMentorId}
+                onchange={handleMentorChange}
+                data-field="mentorPicker">
+            </lightning-record-picker>
+
+            <!-- User Type -->
             <lightning-combobox
                 label="User Type"
                 value={userType}
@@ -63,7 +93,7 @@
             <div class="slds-m-top_medium">
                 <lightning-button
                     variant="brand"
-                    label="Create Contact & User"
+                    label="Create User"
                     onclick={handleSubmit}
                     disabled={isLoading}>
                 </lightning-button>
@@ -77,7 +107,7 @@
                 </lightning-spinner>
             </template>
 
-            <!-- Inline Error/Status Message (Optional Backup) -->
+            <!-- Inline Error/Status Message -->
             <template if:true={message}>
                 <div class={messageClass}>
                     <p>{message}</p>

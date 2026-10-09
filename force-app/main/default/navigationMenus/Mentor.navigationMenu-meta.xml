@@ -38,4 +38,11 @@
         <target>/all-requests</target>
         <type>InternalLink</type>
     </navigationMenuItem>
+    <navigationMenuItem>
+        <label>My Requests</label>
+        <position>6</position>
+        <publiclyAvailable>false</publiclyAvailable>
+        <target>/my-requests</target>
+        <type>InternalLink</type>
+    </navigationMenuItem>
 </NavigationMenu>

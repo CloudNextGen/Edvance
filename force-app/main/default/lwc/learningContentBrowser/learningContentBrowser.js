@@ -277,13 +277,7 @@ export default class LearningContentBrowser extends LightningElement {
             return '';
         }
 
-        const { totalCount, visibleCount } = this._accessGapCounts;
-        const missingCount = Math.max(0, totalCount - visibleCount);
-        const fileLabel = missingCount === 1 ? 'file' : 'files';
-        const totalLabel = totalCount === 1 ? 'file' : 'files';
-        const visibleLabel = visibleCount === 1 ? 'is' : 'are';
-
-        return `Please contact your admin to get access to the remaining ${missingCount} ${fileLabel}. This folder contains ${totalCount} ${totalLabel}, but only ${visibleCount} ${visibleLabel} currently available in your view.`;
+        return 'Next file and folder are locked. Please contact your Admin/Mentor for access.';
     }
 
     handleNextLessonClick() {

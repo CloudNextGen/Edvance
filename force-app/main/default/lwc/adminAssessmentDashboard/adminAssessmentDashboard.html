@@ -18,27 +18,38 @@
                         <h1 class="screen-title">Experience Portal Users</h1>
                         <p class="screen-subtitle">Select an external student or contact to audit their assignments and transcripts.</p>
                     </div>
-                    <template if:true={showCreateUserLink}>
-                        <button type="button" class="btn-create-user" onclick={handleOpenCreateUser}>
-                            + Create User
-                        </button>
-                    </template>
+                    <div class="dashboard-header-actions">
+                        <template if:true={showCreateUserLink}>
+                            <button type="button" class="btn-view-appeals" onclick={handleOpenAppeals}>
+                                View Appeals
+                            </button>
+                        </template>
+                        <template if:true={showCreateUserLink}>
+                            <button type="button" class="btn-create-user" onclick={handleOpenCreateUser}>
+                                + Create User
+                            </button>
+                        </template>
+                    </div>
                 </div>
         
-                <div class="user-search-bar">
-                    <lightning-icon icon-name="utility:search" size="x-small" class="user-search-icon"></lightning-icon>
-                    <input
-                        type="text"
-                        class="user-search-input"
-                        placeholder="Search by name or email…"
-                        value={searchTerm}
-                        oninput={handleSearchChange} />
-                    <template if:true={searchTerm}>
-                        <button class="user-search-clear" onclick={handleClearSearch}>
-                            <lightning-icon icon-name="utility:close" size="xx-small"></lightning-icon>
-                        </button>
-                    </template>
-                </div>
+                <!-- SEARCH BAR -->
+                <template if:false={isModalOpen}>
+                    <div class="user-search-bar">
+                        <lightning-icon icon-name="utility:search" size="x-small" class="user-search-icon"></lightning-icon>
+                        <input
+                            type="search"
+                            class="user-search-input"
+                            placeholder="Search by name or email…"
+                            value={searchTerm}
+                            autocomplete="off"
+                            oninput={handleSearchChange} />
+                        <template if:true={searchTerm}>
+                            <button class="user-search-clear" onclick={handleClearSearch} type="button">
+                                <lightning-icon icon-name="utility:close" size="xx-small"></lightning-icon>
+                            </button>
+                        </template>
+                    </div>
+                </template>
         
                 <template if:true={hasNoSearchResults}>
                     <div class="user-search-empty">
@@ -46,57 +57,221 @@
                     </div>
                 </template>
         
-                <div class="user-grid">
-                    <template for:each={filteredUsers} for:item="u">
-                        <div key={u.Id}
-                            class="user-card"
-                            data-id={u.Id}
-                            data-name={u.Name}>
-                            <div class="user-card-avatar">
-                                <lightning-icon icon-name="standard:avatar" size="small"></lightning-icon>
-                            </div>
-                            <p class="user-name">{u.Name}</p>
-                            <p class="user-meta">{u.Email}</p>
-                            <p class="user-account">🏢 {u.Account.Name}</p>
+                <!-- DYNAMIC FULLY RESPONSIVE ROSTER TABLE -->
+                <div class="users-table-container">
+                    <table class="users-roster-table">
+                        <thead>
+                            <tr>
+                                <th class="col-name">
+                                    <span class="th-content">
+                                        <lightning-icon icon-name="utility:user" size="xx-small" class="th-icon"></lightning-icon>
+                                        Member
+                                    </span>
+                                </th>
+                                <th class="col-contact">
+                                    <span class="th-content">
+                                        <lightning-icon icon-name="utility:email" size="xx-small" class="th-icon"></lightning-icon>
+                                        Contact Information
+                                    </span>
+                                </th>
+                                <th class="col-company">
+                                    <span class="th-content">
+                                        <lightning-icon icon-name="utility:company" size="xx-small" class="th-icon"></lightning-icon>
+                                        Account / Department
+                                    </span>
+                                </th>
+                                <th class="col-actions">
+                                    <span class="th-content">
+                                        <lightning-icon icon-name="utility:settings" size="xx-small" class="th-icon"></lightning-icon>
+                                        Actions
+                                    </span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template for:each={filteredUsers} for:item="u">
+                                <tr key={u.Id} class="user-table-row">
+                                    <!-- Member Profile -->
+                                    <td class="col-name" data-label="Member">
+                                        <div class="user-identity-cell">
+                                            <div class="table-inline-avatar">
+                                                <lightning-icon icon-name="standard:avatar" size="small"></lightning-icon>
+                                            </div>
+                                            <div class="user-name-box">
+                                                <span class="user-primary-name">{u.Name}</span>
+                                                <template if:true={u.Title}>
+                                                    <span class="user-subtitle">{u.Title}</span>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </td>
 
-                            <template if:true={showAssignmentsLink}>
-                                <div class="user-card-actions"
-                                    data-id={u.Id}
-                                    data-name={u.Name}
-                                    onclick={handleUserClick}>
-                                    <span class="user-card-go">View Assignments →</span>
-                                </div>
-                            </template>
-                            <template if:true={showAssignFilesLink}>
-                                <button type="button"
-                                    class="assign-link"
-                                    data-contact-id={u.Id}
-                                    data-name={u.Name}
-                                    onclick={handleOpenAssign}>
-                                    Assign Files →
-                                </button>
-                            </template>
+                                    <!-- Contact Details -->
+                                    <td class="col-contact" data-label="Contact">
+                                        <div class="contact-pill-box">
+                                            <template if:true={u.hasEmail}>
+                                                <div class="contact-meta-item">
+                                                    <lightning-icon icon-name="utility:email" size="xx-small" class="meta-icon"></lightning-icon>
+                                                    <span class="meta-text">{u.EmailDisplay}</span>
+                                                </div>
+                                            </template>
 
-                            <template if:true={showAssignFilesLink}>
-                                <button type="button" class="assign-link" data-contact-id={u.Id} data-name={u.Name} onclick={handleOpenAssignAssignments}>
-                                    Assign Assignments →
-                                </button>
-                            </template>
+                                            <template if:true={u.hasPhone}>
+                                                <div class="contact-meta-item">
+                                                    <lightning-icon icon-name="utility:call" size="xx-small" class="meta-icon"></lightning-icon>
+                                                    <span class="meta-text">{u.PhoneDisplay}</span>
+                                                </div>
+                                            </template>
 
-                            <template if:true={showAttendanceLink}>
-                                <button type="button"
-                                    class="attendance-link"
-                                    data-contact-id={u.Id}
-                                    data-name={u.Name}
-                                    onclick={handleOpenAttendance}>
-                                        View Attendance →
-                                </button>
+                                            <template if:false={u.hasEmail}>
+                                                <template if:false={u.hasPhone}>
+                                                    <span class="no-contact-text">—</span>
+                                                </template>
+                                            </template>
+                                        </div>
+                                    </td>
+
+                                    <!-- Account / Department Badge -->
+                                    <td class="col-company" data-label="Account">
+                                        <div class="company-badge-wrapper">
+                                            <span class="company-badge">
+                                                <lightning-icon icon-name="utility:company" size="xx-small" class="badge-icon"></lightning-icon>
+                                                <span class="company-name">{u.AccountName}</span>
+                                            </span>
+                                        </div>
+                                    </td>
+
+                                    <!-- Administrative Actions -->
+                                    <td class="col-actions" data-label="Actions">
+                                        <div class="actions-cell-wrapper">
+                                            <div class="action-btn-group">
+                                                <template if:true={showAttendanceLink}>    
+                                                    <button type="button"
+                                                        class="admin-action-btn btn-tone-edit"
+                                                        data-id={u.Id}
+                                                        data-name={u.Name}
+                                                        onclick={handleOpenEditUser}
+                                                        title="Edit Contact">
+                                                        <lightning-icon icon-name="utility:edit" size="xx-small"></lightning-icon>
+                                                        <span>Edit</span>
+                                                    </button>
+                                                </template>
+
+                                                <template if:true={showAssignmentsLink}>
+                                                    <button type="button"
+                                                        class="admin-action-btn btn-tone-assignments"
+                                                        data-id={u.Id}
+                                                        data-name={u.Name}
+                                                        onclick={handleUserClick}
+                                                        title="View Assignments">
+                                                        <lightning-icon icon-name="utility:list" size="xx-small"></lightning-icon>
+                                                        <span>Audits</span>
+                                                    </button>
+                                                </template>
+
+                                                <template if:true={showAssignFilesLink}>
+                                                    <button type="button"
+                                                        class="admin-action-btn btn-tone-files"
+                                                        data-contact-id={u.Id}
+                                                        data-name={u.Name}
+                                                        onclick={handleOpenAssign}
+                                                        title="Assign or revoke Learning Files">
+                                                        <lightning-icon icon-name="utility:file" size="xx-small"></lightning-icon>
+                                                        <span>Files</span>
+                                                    </button>
+                                                </template>
+
+                                                <template if:true={showAssignFilesLink}>
+                                                    <button type="button"
+                                                        class="admin-action-btn btn-tone-tests"
+                                                        data-contact-id={u.Id}
+                                                        data-name={u.Name}
+                                                        onclick={handleOpenAssignAssignments}
+                                                        title="Assign Tests">
+                                                        <lightning-icon icon-name="utility:note" size="xx-small"></lightning-icon>
+                                                        <span>Assign</span>
+                                                    </button>
+                                                </template>
+
+                                                <template if:true={showAttendanceLink}>
+                                                    <button type="button"
+                                                        class="admin-action-btn btn-tone-attendance"
+                                                        data-contact-id={u.Id}
+                                                        data-name={u.Name}
+                                                        onclick={handleOpenAttendance}
+                                                        title="View Attendance">
+                                                        <lightning-icon icon-name="utility:event" size="xx-small"></lightning-icon>
+                                                        <span>Attendance</span>
+                                                    </button>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
                             </template>
-                        </div>
-                    </template>
+                        </tbody>
+                    </table>
                 </div>
 
-                <!-- Modal rendered ONCE, outside the loop -->
+                <!-- EDIT CONTACT MODAL -->
+                <template if:true={showEditUserModal}>
+                    <div class="ccu-modal-overlay">
+                        <div class="ccu-modal-panel edit-user-panel">
+                            <button class="ccu-modal-close" onclick={handleCloseEditUser} title="Close">
+                                <lightning-icon icon-name="utility:close" size="x-small"></lightning-icon>
+                            </button>
+                            
+                            <h2 class="edit-modal-title">Edit Contact Details</h2>
+                            <p class="edit-modal-subtitle">{selectedUserName}</p>
+
+                            <lightning-record-edit-form
+                                record-id={selectedContactId}
+                                object-api-name="Contact"
+                                onsuccess={handleEditSuccess}
+                                onerror={handleEditError}>
+                                
+                                <lightning-messages></lightning-messages>
+
+                                <div class="slds-grid slds-wrap slds-gutters edit-form-fields">
+                                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                                        <lightning-input-field field-name="FirstName"></lightning-input-field>
+                                    </div>
+                                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                                        <lightning-input-field field-name="LastName"></lightning-input-field>
+                                    </div>
+
+                                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                                        <lightning-input-field field-name="Email"></lightning-input-field>
+                                    </div>
+                                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                                        <lightning-input-field field-name="Phone"></lightning-input-field>
+                                    </div>
+
+                                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                                        <lightning-input-field field-name="AccountId"></lightning-input-field>
+                                    </div>
+                                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                                        <lightning-input-field field-name="Manager__c"></lightning-input-field>
+                                    </div>
+
+                                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                                        <lightning-input-field field-name="HR__c"></lightning-input-field>
+                                    </div>
+                                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                                        <lightning-input-field field-name="Mentor__c"></lightning-input-field>
+                                    </div>
+                                </div>
+
+                                <div class="edit-form-footer">
+                                    <lightning-button label="Cancel" onclick={handleCloseEditUser} class="slds-m-right_small"></lightning-button>
+                                    <lightning-button variant="brand" type="submit" label="Save Changes"></lightning-button>
+                                </div>
+                            </lightning-record-edit-form>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- ASSIGN FILES MODAL -->
                 <template if:true={showAssignModal}>
                     <c-assign-learning-files-modal
                         contact-id={selectedContactId}
@@ -104,6 +279,8 @@
                         onclose={handleCloseAssign}>
                     </c-assign-learning-files-modal>
                 </template>
+
+                <!-- ASSIGN ASSIGNMENTS MODAL -->
                 <template if:true={showAssignAssignmentsModal}>
                     <c-assign-assignments-modal
                         contact-id={selectedContactId}
@@ -111,6 +288,8 @@
                         onclose={handleCloseAssignAssignments}>
                     </c-assign-assignments-modal>
                 </template>
+
+                <!-- CREATE USER MODAL -->
                 <template if:true={showCreateUserModal}>
                     <div class="ccu-modal-overlay">
                         <div class="ccu-modal-panel">
@@ -124,6 +303,7 @@
             </div>
         </template>
 
+        <!-- ATTENDANCE SCREEN -->
         <template if:true={showAttendanceScreen}>
             <c-attendance-admin-detail
                 contact-id={selectedContactId}
@@ -132,7 +312,110 @@
             </c-attendance-admin-detail>
         </template>
 
-        <!-- ═══════════════════ CATEGORY SCREEN ═══════════════════ -->
+        <!-- APPEALS SCREEN -->
+        <template if:true={showAppealsScreen}>
+            <div class="screen appeals-screen">
+                <button class="back-link" onclick={handleBackFromAppeals}>
+                    <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
+                    <span>All Users</span>
+                </button>
+                <div class="screen-header screen-header-with-action">
+                    <div class="screen-header-text">
+                        <span class="eyebrow">Admin Console</span>
+                        <h1 class="screen-title">Pending Attendance Appeals</h1>
+                        <p class="screen-subtitle">Select a team member's name to review their appeal details.</p>
+                    </div>
+                    <div class="dashboard-header-actions">
+                        <lightning-button
+                            label="Refresh"
+                            title="Refresh pending appeals"
+                            icon-name="utility:refresh"
+                            onclick={handleRefreshAppeals}
+                            disabled={isRefreshingAppeals}>
+                        </lightning-button>
+                    </div>
+                </div>
+
+                <template if:true={isAppealsLoading}>
+                    <div class="loading-panel">
+                        <lightning-spinner alternative-text="Loading pending appeals" size="medium"></lightning-spinner>
+                    </div>
+                </template>
+                <template if:false={isAppealsLoading}>
+                    <template if:true={showAppealDetail}>
+                        <section class="appeal-inline-detail" aria-labelledby="appeal-detail-title">
+                            <button type="button" class="back-link" onclick={handleCloseAppealDetail}>
+                                <lightning-icon icon-name="utility:back" size="xx-small"></lightning-icon>
+                                <span>Back to appeals</span>
+                            </button>
+                            <span class="eyebrow">Attendance Appeal</span>
+                            <h2 id="appeal-detail-title" class="appeal-modal-title">{selectedAppeal.EmployeeName}</h2>
+                            <dl class="appeal-detail-list">
+                                <div><dt>Attendance event</dt><dd>{selectedAppeal.Type__c}</dd></div>
+                                <div><dt>Date</dt><dd>{selectedAppeal.AppealDate}</dd></div>
+                                <div><dt>Late by</dt><dd>{selectedAppeal.Late_Minutes__c} minutes</dd></div>
+                                <div><dt>Current deduction</dt><dd>₹{selectedAppeal.Deduction_Amount__c}</dd></div>
+                                <div><dt>Appeal reason</dt><dd>{selectedAppeal.AppealReason}</dd></div>
+                            </dl>
+                        </section>
+                    </template>
+                    <template if:false={showAppealDetail}>
+                        <template if:true={hasNoPendingAppeals}>
+                            <div class="appeals-empty-state">There are no pending appeals.</div>
+                        </template>
+                        <template if:false={hasNoPendingAppeals}>
+                            <div class="appeal-review-toolbar">
+                                <p class="appeal-selection-count">{selectedAppealCount} selected</p>
+                                <div class="appeal-selection-actions">
+                                    <button type="button" class="btn-approve-all" onclick={handleApproveSelected} disabled={disableSelectedReviewActions}>
+                                        Approve
+                                    </button>
+                                    <button type="button" class="btn-reject-selected" onclick={handleRejectSelected} disabled={disableSelectedReviewActions}>
+                                        Reject
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="appeals-table-wrap">
+                                <table class="appeals-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="appeal-checkbox-column" aria-label="Select appeal"></th>
+                                            <th>Team Member</th>
+                                            <th>Attendance Event</th>
+                                            <th>Date</th>
+                                            <th>Late (minutes)</th>
+                                            <th>Current Deduction</th>
+                                            <th>Appeal Reason</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template for:each={pendingAppeals} for:item="appeal">
+                                            <tr key={appeal.Id}>
+                                                <td class="appeal-checkbox-column">
+                                                    <input type="checkbox" data-id={appeal.Id} checked={appeal.isSelected} aria-label="Select appeal" onchange={handleAppealSelection} />
+                                                </td>
+                                                <td>
+                                                    <button type="button" class="appeal-user-link" data-id={appeal.Id} onclick={handleViewAppeal}>
+                                                        {appeal.EmployeeName}
+                                                    </button>
+                                                </td>
+                                                <td>{appeal.Type__c}</td>
+                                                <td>{appeal.AppealDate}</td>
+                                                <td>{appeal.Late_Minutes__c}</td>
+                                                <td>{appeal.CurrentDeductionLabel}</td>
+                                                <td class="appeal-reason-cell" title={appeal.AppealReason}>{appeal.AppealReason}</td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </template>
+                    </template>
+                </template>
+            </div>
+        </template>
+
+        <!-- CATEGORY SCREEN -->
         <template if:true={showCategoryScreen}>
             <div class="screen">
                 <button class="back-link" onclick={navBackToUsers}>
@@ -164,7 +447,7 @@
             </div>
         </template>
 
-        <!-- ═══════════════════ ASSIGNMENT SCREEN ═══════════════════ -->
+        <!-- ASSIGNMENT SCREEN -->
         <template if:true={showAssignmentScreen}>
             <div class="screen">
                 <button class="back-link" onclick={navBackToCategories}>
@@ -208,7 +491,7 @@
             </div>
         </template>
 
-        <!-- ═══════════════════ ATTEMPTS SCREEN ═══════════════════ -->
+        <!-- ATTEMPTS SCREEN -->
         <template if:true={showAttemptsScreen}>
             <div class="screen">
                 <button class="back-link" onclick={navBackToAssignments}>
@@ -261,7 +544,7 @@
             </div>
         </template>
 
-        <!-- ═══════════════════ REVIEW SCREEN ═══════════════════ -->
+        <!-- REVIEW SCREEN -->
         <template if:true={showReviewScreen}>
             <div class="screen">
                 <button class="back-link" onclick={navBackToAttempts}>

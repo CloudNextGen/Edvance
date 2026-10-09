@@ -8,7 +8,40 @@
  */
 public with sharing class AttendanceAdminController {
 
-    // ---------- Pending appeals (per employee) ----------
+
+    @AuraEnabled
+    public static Integer reviewSelectedAppeals(List<Id> logIds, Boolean approve) {
+        if (!FeatureManagement.checkPermission('View_Attendance')) {
+            throw new AuraHandledException('You do not have permission to review attendance appeals.');
+        }
+        if (logIds == null || logIds.isEmpty()) {
+            throw new AuraHandledException('Select at least one appeal to review.');
+        }
+        if (logIds.size() > 200) {
+            throw new AuraHandledException('Select no more than 200 appeals at a time.');
+        }
+
+        List<Attendance_Log__c> pendingAppeals = [
+            SELECT Id
+            FROM Attendance_Log__c
+            WHERE Id IN :logIds
+              AND Status__c = 'Pending'
+              AND Appeal_Submitted__c = true
+        ];
+        Datetime reviewedAt = System.now();
+        for (Attendance_Log__c appeal : pendingAppeals) {
+            appeal.Status__c = approve ? 'Excused' : 'Not Excused';
+            appeal.Excused_Date__c = reviewedAt;
+            if (approve) {
+                appeal.Deduction_Amount__c = 0;
+                appeal.Excused_By__c = UserInfo.getUserId();
+            }
+        }
+        if (!pendingAppeals.isEmpty()) {
+            update pendingAppeals;
+        }
+        return pendingAppeals.size();
+    }
 
     @AuraEnabled
     public static List<Attendance_Log__c> getPendingLateInstances(Id employeeId) {
@@ -24,7 +57,15 @@ public with sharing class AttendanceAdminController {
     }
 
     @AuraEnabled
+    public static List<Attendance_Log__c> getPendingAppealsForDashboard() {
+        return getPendingLateInstances(null);
+    }
+
+    @AuraEnabled
     public static void reviewLateInstance(Id logId, Boolean approve) {
+        if (!FeatureManagement.checkPermission('View_Attendance')) {
+            throw new AuraHandledException('You do not have permission to review attendance appeals.');
+        }
         if (logId == null) {
             throw new AuraHandledException('Log record is required.');
         }
@@ -87,7 +128,7 @@ public with sharing class AttendanceAdminController {
         String query = 'SELECT Id, Date__c, Office_Check_In_Time__c, Office_Check_Out_Time__c, ' +
                         'Lunch_Out_Time__c, Lunch_In_Time__c, Office_Late_Minutes__c, ' +
                         'Lunch_Late_Minutes__c, Total_Deduction_Amount__c, ' +
-                        '(SELECT Status__c FROM Attendance_Logs__r WHERE Late_Minutes__c > 0) ' +
+                        '(SELECT Status__c, Deduction_Amount__c FROM Attendance_Logs__r WHERE Late_Minutes__c > 0) ' +
                         'FROM Attendance_Summary__c ' + whereClause +
                         'ORDER BY Date__c DESC LIMIT :pageSize OFFSET :offset';
 

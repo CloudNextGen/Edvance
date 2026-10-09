@@ -9,6 +9,20 @@
             </header>
 
             <div class="slds-modal__content slds-p-around_medium">
+                <div class="file-access-tabs" role="tablist" aria-label="Learning file access">
+                    <lightning-button
+                        label="Assign Files"
+                        variant={assignTabVariant}
+                        onclick={handleShowAssignTab}>
+                    </lightning-button>
+                    <lightning-button
+                        label="Granted Files"
+                        variant={grantedTabVariant}
+                        onclick={handleShowGrantedTab}>
+                    </lightning-button>
+                </div>
+
+                <template if:true={isAssignTab}>
                 <!-- Search Box (Left) & Topic Filter (Top-Right) -->
                 <div class="slds-grid slds-gutters slds-m-bottom_medium">
                     <div class="slds-col slds-size_2-of-3">
@@ -88,17 +102,115 @@
                         No files or folders found matching your filters.
                     </div>
                 </template>
+                </template>
+
+                <template if:true={isGrantedFilesTab}>
+                    <div class="granted-files-heading">
+                        <div>
+                            <h3 class="slds-text-heading_small">Files available to {userName}</h3>
+                            <p class="slds-text-body_small slds-text-color_weak">Revoke access for any file currently granted to this team member.</p>
+                        </div>
+                        <div class="granted-files-actions">
+                            <lightning-button
+                                label={revokeSelectedLabel}
+                                title="Revoke access to selected files"
+                                variant="destructive"
+                                icon-name="utility:lock"
+                                onclick={handleRevokeSelectedFiles}
+                                disabled={disableRevokeSelected}>
+                            </lightning-button>
+                            <lightning-button-icon
+                                icon-name="utility:refresh"
+                                alternative-text="Refresh granted files"
+                                title="Refresh granted files"
+                                onclick={handleRefreshGrantedFiles}
+                                disabled={isGrantedFilesLoading}>
+                            </lightning-button-icon>
+                        </div>
+                    </div>
+
+                    <template if:true={isGrantedFilesLoading}>
+                        <lightning-spinner alternative-text="Loading granted files" size="small"></lightning-spinner>
+                    </template>
+
+                    <template if:true={hasGrantedFiles}>
+                        <div class="granted-files-table-wrap">
+                            <table class="slds-table slds-table_cell-buffer slds-table_bordered granted-files-table">
+                                <thead>
+                                    <tr>
+                                        <th scope="col" class="granted-file-select-column">
+                                            <lightning-input
+                                                type="checkbox"
+                                                variant="label-hidden"
+                                                label="Select all granted files"
+                                                checked={areAllGrantedFilesSelected}
+                                                onchange={handleSelectAllGrantedFiles}
+                                                disabled={isRevoking}>
+                                            </lightning-input>
+                                        </th>
+                                        <th scope="col"><div class="slds-truncate" title="File">File</div></th>
+                                        <th scope="col"><div class="slds-truncate" title="Granted">Granted</div></th>
+                                        <th scope="col"><div class="slds-truncate" title="Progress">Progress</div></th>
+                                        <th scope="col"><div class="slds-truncate" title="Action">Action</div></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template for:each={grantedFiles} for:item="file">
+                                        <tr key={file.accessId}>
+                                            <td class="granted-file-select-column">
+                                                <lightning-input
+                                                    type="checkbox"
+                                                    variant="label-hidden"
+                                                    label="Select file for bulk revoke"
+                                                    data-file-id={file.fileId}
+                                                    checked={file.selected}
+                                                    onchange={handleGrantedFileSelection}
+                                                    disabled={isRevoking}>
+                                                </lightning-input>
+                                            </td>
+                                            <th scope="row"><div class="slds-truncate granted-file-name" title={file.fileName}>{file.fileName}</div></th>
+                                            <td><div class="slds-truncate">{file.grantedDateLabel}</div></td>
+                                            <td><lightning-badge label={file.completionStatusLabel}></lightning-badge></td>
+                                            <td>
+                                                <lightning-button
+                                                    label="Revoke"
+                                                    title="Revoke file access"
+                                                    variant="destructive-text"
+                                                    icon-name="utility:lock"
+                                                    data-file-id={file.fileId}
+                                                    onclick={handleRevokeFile}
+                                                    disabled={isRevoking}>
+                                                </lightning-button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </template>
+
+                    <template if:false={hasGrantedFiles}>
+                        <template if:false={isGrantedFilesLoading}>
+                            <div class="granted-files-empty">
+                                <lightning-icon icon-name="utility:success" size="small"></lightning-icon>
+                                <p>No files are currently granted to this team member.</p>
+                            </div>
+                        </template>
+                    </template>
+                </template>
             </div>
 
             <footer class="slds-modal__footer">
                 <lightning-button label="Cancel" onclick={handleClose}></lightning-button>
-                <lightning-button
+                <template if:true={isAssignTab}>
+                  <lightning-button
                     variant="brand"
                     label={assignButtonLabel}
                     disabled={noneSelected}
                     onclick={handleAssign}
                     class="slds-m-left_x-small">
-                </lightning-button>
+                  </lightning-button>
+                </template>
             </footer>
         </div>
     </section>

@@ -6,7 +6,7 @@
     <summaryFilterItems>
         <field>Attendance_Log__c.Type__c</field>
         <operation>equals</operation>
-        <value>Lunch Check-In</value>
+        <value>Lunch Check-Out</value>
     </summaryFilterItems>
     <summaryForeignKey>Attendance_Log__c.Attendance_Summary__c</summaryForeignKey>
     <summaryOperation>sum</summaryOperation>

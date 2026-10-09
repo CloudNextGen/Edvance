@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
-    <fullName>Excused_By__c</fullName>
+    <fullName>Mentor__c</fullName>
     <deleteConstraint>SetNull</deleteConstraint>
-    <label>Excused By</label>
+    <label>Mentor</label>
     <referenceTo>User</referenceTo>
-    <relationshipName>Attendance_Logs</relationshipName>
+    <relationshipName>Contacts2</relationshipName>
     <required>false</required>
-    <trackHistory>true</trackHistory>
-    <trackTrending>false</trackTrending>
+    <trackFeedHistory>false</trackFeedHistory>
     <type>Lookup</type>
 </CustomField>

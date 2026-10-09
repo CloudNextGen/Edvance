@@ -1,39 +1,27 @@
 <template>
-    <div class="instruction-card">
+    <template if:true={hasAnyInstructions}>
+        <div class="instruction-card">
 
-        <!-- Unified Card Header -->
-        <div class="card-header slds-p-horizontal_medium slds-p-vertical_small">
-            <div class="header-inner">
-                <lightning-icon icon-name="custom:custom19" size="small" class="header-icon"></lightning-icon>
-                <span class="header-title">Guidelines &amp; Instructions</span>
-            </div>
-            <template if:true={roleName}>
-                <span class="role-pill">{roleName}</span>
-            </template>
-        </div>
-
-        <!-- Spinner -->
-        <template if:true={isLoading}>
-            <div class="slds-p-around_large slds-align_absolute-center">
-                <lightning-spinner alternative-text="Loading..." size="medium"></lightning-spinner>
-            </div>
-        </template>
-
-        <!-- Error State -->
-        <template if:true={error}>
-            <div class="slds-p-around_medium">
-                <div class="slds-notify slds-notify_alert slds-alert_error" role="alert">
-                    <lightning-icon icon-name="utility:error" size="x-small" class="slds-m-right_x-small" variant="inverse"></lightning-icon>
-                    <h2>{error}</h2>
+            <!-- Spinner -->
+            <template if:true={isLoading}>
+                <div class="slds-p-around_large slds-align_absolute-center">
+                    <lightning-spinner alternative-text="Loading..." size="medium"></lightning-spinner>
                 </div>
-            </div>
-        </template>
+            </template>
 
-        <!-- Main Body -->
-        <template if:false={isLoading}>
-            <div class="instruction-container">
-                <template if:true={hasAnyInstructions}>
+            <!-- Error State -->
+            <template if:true={error}>
+                <div class="slds-p-around_medium">
+                    <div class="slds-notify slds-notify_alert slds-alert_error" role="alert">
+                        <lightning-icon icon-name="utility:error" size="x-small" class="slds-m-right_x-small" variant="inverse"></lightning-icon>
+                        <h2>{error}</h2>
+                    </div>
+                </div>
+            </template>
 
+            <!-- Main Body -->
+            <template if:false={isLoading}>
+                <div class="instruction-container">
                     <!-- Section 1: General (All) -->
                     <template if:true={hasGeneral}>
                         <div class="section-divider">
@@ -71,18 +59,9 @@
                             </template>
                         </div>
                     </template>
+                </div>
+            </template>
 
-                </template>
-
-                <!-- Empty State -->
-                <template if:false={hasAnyInstructions}>
-                    <div class="slds-text-align_center slds-p-around_large">
-                        <lightning-icon icon-name="utility:info_alt" size="medium" variant="neutral"></lightning-icon>
-                        <p class="slds-m-top_small empty-text">No active instructions available at this time.</p>
-                    </div>
-                </template>
-            </div>
-        </template>
-
-    </div>
+        </div>
+    </template>
 </template>

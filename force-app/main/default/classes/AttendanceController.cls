@@ -9,9 +9,15 @@
  *   This is the ONLY thing that makes a late record visible to a manager —
  *   see AttendanceApprovalController.
  *
- * Saturdays are excluded from lateness: the punch time is still captured and
- * written normally, it just never gets counted as late (no Late_Minutes__c,
- * no deduction) — see calculateLateMinutes / isSaturday.
+ * Punch order: Office Check-In -> Lunch Check-In (lunch STARTS, shown as "Lunch In")
+ *              -> Lunch Check-Out (lunch ENDS, shown as "Lunch Out") -> Office Check-Out.
+ * Lunch lateness is measured on 'Lunch Check-Out': the time the employee returns
+ * versus the Lunch Check-In time + Lunch_Duration_Minutes__c.
+ *
+ * Photos: required for Office Check-In only. Office Check-Out needs no photo.
+ * Lunch In / Lunch Out follow Need_Lunch_Photo__c.
+ *
+ * Saturday lateness can be excluded through Assessment_Portal_Config__mdt.Exclude_Saturday__c.
  *
  * Assumes Attendance_Config__mdt (Custom Metadata Type) has fields:
  *   Office_Name__c (Text), Latitude__c (Number), Longitude__c (Number),
@@ -23,9 +29,12 @@ public with sharing class AttendanceController {
     private static final Decimal MAX_ACCEPTABLE_ACCURACY_METERS = 100;
 
     private static final Decimal DEDUCTION_AMOUNT = 50;
+    private static final Integer MONTHLY_LATE_GRACE_DAYS = 3;
+    @TestVisible private static Boolean excludeSaturdayOverride;
 
+    // Lunch Check-In = lunch starts, Lunch Check-Out = lunch ends
     private static final List<String> PUNCH_SEQUENCE = new List<String>{
-        'Office Check-In', 'Lunch Check-Out', 'Lunch Check-In', 'Office Check-Out'
+        'Office Check-In', 'Lunch Check-In', 'Lunch Check-Out', 'Office Check-Out'
     };
 
     // ---------- Public methods ----------
@@ -159,12 +168,17 @@ public with sharing class AttendanceController {
                 logRec.Rejection_Reason__c = !accuracyOk ? 'Your attendance is not captured due to the Poor GPS accuracy, Please try again.' : 'Your attendance is not captured as you are outside the allowed office radius.';
             }
 
-            if (isValid && (punchType == 'Office Check-In' || punchType == 'Lunch Check-In')) {
+            // Lateness is evaluated on Office Check-In and Lunch Check-Out. Both share
+            // the monthly three-distinct-late-day grace; after grace, each late event
+            // gets its own deduction, even when both events are late on the same date.
+            if (isValid && (punchType == 'Office Check-In' || punchType == 'Lunch Check-Out')) {
                 Integer lateMinutes = calculateLateMinutes(punchType, office, summary, logRec.Event_Timestamp__c);
                 logRec.Late_Minutes__c = lateMinutes;
                 if (lateMinutes > 0) {
                     logRec.Status__c = 'Not Excused';
-                    logRec.Deduction_Amount__c = DEDUCTION_AMOUNT;
+                    logRec.Deduction_Amount__c = isBeyondMonthlyLateGrace(contactId, today)
+                        ? DEDUCTION_AMOUNT
+                        : 0;
                 } else {
                     logRec.Status__c = 'On Time';
                 }
@@ -201,7 +215,8 @@ public with sharing class AttendanceController {
         Id contactId = getCurrentContactId();
 
         List<Attendance_Log__c> matches = [
-            SELECT Id FROM Attendance_Log__c
+            SELECT Id, Type__c, Late_Minutes__c, Employee__r.Name
+            FROM Attendance_Log__c
             WHERE Id = :logId AND Employee__c = :contactId AND Status__c = 'Not Excused' AND Late_Minutes__c > 0 AND Appeal_Submitted__c = false
             LIMIT 1
         ];
@@ -214,6 +229,116 @@ public with sharing class AttendanceController {
         logRec.Excusal_Reason__c = reason;
         logRec.Appeal_Submitted__c = true;
         update logRec;
+        notifyAttendanceAppealReviewers(matches[0]);
+    }
+
+    private static void notifyAttendanceAppealReviewers(Attendance_Log__c appeal) {
+        try {
+            List<CustomNotificationType> notificationTypes = [
+                SELECT Id
+                FROM CustomNotificationType
+                WHERE DeveloperName = 'Attendance_Appeal_Submitted'
+                WITH SYSTEM_MODE
+                LIMIT 1
+            ];
+            List<CustomPermission> permissions = [
+                SELECT Id
+                FROM CustomPermission
+                WHERE DeveloperName = 'View_Attendance'
+                WITH SYSTEM_MODE
+                LIMIT 1
+            ];
+            if (notificationTypes.isEmpty() || permissions.isEmpty()) return;
+
+            Set<Id> grantedPermissionSetIds = new Set<Id>();
+            for (SetupEntityAccess grant : [
+                SELECT ParentId
+                FROM SetupEntityAccess
+                WHERE SetupEntityId = :permissions[0].Id
+                WITH SYSTEM_MODE
+            ]) {
+                grantedPermissionSetIds.add(grant.ParentId);
+            }
+            if (grantedPermissionSetIds.isEmpty()) return;
+
+            Set<Id> profileIds = new Set<Id>();
+            Set<Id> assignedPermissionSetIds = new Set<Id>();
+            for (PermissionSet permissionSet : [
+                SELECT Id, IsOwnedByProfile, ProfileId
+                FROM PermissionSet
+                WHERE Id IN :grantedPermissionSetIds
+                WITH SYSTEM_MODE
+            ]) {
+                if (permissionSet.IsOwnedByProfile && permissionSet.ProfileId != null) {
+                    profileIds.add(permissionSet.ProfileId);
+                } else {
+                    assignedPermissionSetIds.add(permissionSet.Id);
+                }
+            }
+
+            Set<Id> recipientIds = new Set<Id>();
+            if (!assignedPermissionSetIds.isEmpty()) {
+                for (PermissionSetAssignment assignment : [
+                    SELECT AssigneeId
+                    FROM PermissionSetAssignment
+                    WHERE PermissionSetId IN :assignedPermissionSetIds
+                      AND Assignee.IsActive = true
+                    WITH SYSTEM_MODE
+                ]) {
+                    recipientIds.add(assignment.AssigneeId);
+                }
+
+                Set<Id> permissionSetGroupIds = new Set<Id>();
+                for (PermissionSetGroupComponent component : [
+                    SELECT PermissionSetGroupId
+                    FROM PermissionSetGroupComponent
+                    WHERE PermissionSetId IN :assignedPermissionSetIds
+                    WITH SYSTEM_MODE
+                ]) {
+                    permissionSetGroupIds.add(component.PermissionSetGroupId);
+                }
+                if (!permissionSetGroupIds.isEmpty()) {
+                    for (PermissionSetAssignment assignment : [
+                        SELECT AssigneeId
+                        FROM PermissionSetAssignment
+                        WHERE PermissionSetGroupId IN :permissionSetGroupIds
+                          AND Assignee.IsActive = true
+                        WITH SYSTEM_MODE
+                    ]) {
+                        recipientIds.add(assignment.AssigneeId);
+                    }
+                }
+            }
+            if (!profileIds.isEmpty()) {
+                for (User permittedUser : [
+                    SELECT Id
+                    FROM User
+                    WHERE ProfileId IN :profileIds AND IsActive = true
+                    WITH SYSTEM_MODE
+                ]) {
+                    recipientIds.add(permittedUser.Id);
+                }
+            }
+
+            recipientIds.remove(UserInfo.getUserId());
+            if (recipientIds.isEmpty()) return;
+
+            Set<String> notificationRecipientIds = new Set<String>();
+            for (Id recipientId : recipientIds) {
+                notificationRecipientIds.add(String.valueOf(recipientId));
+            }
+
+            Messaging.CustomNotification notification = new Messaging.CustomNotification();
+            notification.setTitle('New attendance appeal');
+            notification.setBody(appeal.Employee__r.Name + ' submitted an appeal for ' + appeal.Type__c +
+                ' (' + appeal.Late_Minutes__c + ' minutes late).');
+            notification.setNotificationTypeId(notificationTypes[0].Id);
+            notification.setTargetId(appeal.Id);
+            notification.send(notificationRecipientIds);
+        } catch (Exception e) {
+            // A notification failure must not prevent the employee from submitting their appeal.
+            ErrorLogger.log(e);
+        }
     }
 
     @AuraEnabled
@@ -238,7 +363,7 @@ public with sharing class AttendanceController {
         );
 
         String query = 'SELECT Id, Date__c, Office_Check_In_Time__c, Office_Check_Out_Time__c, ' +
-                        'Lunch_Out_Time__c, Lunch_In_Time__c, Office_Late_Minutes__c, ' +
+                        'Lunch_In_Time__c, Lunch_Out_Time__c, Office_Late_Minutes__c, ' +
                         'Lunch_Late_Minutes__c, Total_Deduction_Amount__c, ' +
                         '(SELECT Status__c FROM Attendance_Logs__r WHERE Late_Minutes__c > 0) ' +
                         'FROM Attendance_Summary__c ' + whereClause +
@@ -270,8 +395,9 @@ public with sharing class AttendanceController {
     }
 
     private static Attendance_Summary__c getOrCreateSummary(Id contactId, Date today, String contactName, String todayLabel) {
+        // Lunch_In_Time__c (lunch start) is needed to compute lateness on Lunch Check-Out
         List<Attendance_Summary__c> existing = [
-            SELECT Id, Lunch_Out_Time__c, Name
+            SELECT Id, Lunch_In_Time__c, Name
             FROM Attendance_Summary__c
             WHERE Employee__c = :contactId AND Date__c = :today
             LIMIT 1
@@ -301,10 +427,10 @@ public with sharing class AttendanceController {
             s.Office_Check_In_Time__c = ts;
         } else if (punchType == 'Office Check-Out') {
             s.Office_Check_Out_Time__c = ts;
-        } else if (punchType == 'Lunch Check-Out') {
-            s.Lunch_Out_Time__c = ts;
         } else if (punchType == 'Lunch Check-In') {
             s.Lunch_In_Time__c = ts;
+        } else if (punchType == 'Lunch Check-Out') {
+            s.Lunch_Out_Time__c = ts;
         }
         // Recompute and set the summary Name to Contact Name + Date
         try {
@@ -317,22 +443,35 @@ public with sharing class AttendanceController {
         update s;
     }
 
-    // Saturdays never count as late — the calling code in submitPunch still writes the
-    // Event_Timestamp__c / summary time normally, this only zeroes out the lateness math
-    // so Status__c falls through to 'On Time' and no Deduction_Amount__c is applied.
-    private static Boolean isSaturday(Date d) {
-        if (d == null) {
+    @TestVisible
+    private static Boolean shouldExcludeSaturday(Date attendanceDate) {
+        Boolean excludeSaturday = excludeSaturdayOverride;
+        if (excludeSaturday == null) {
+            List<Assessment_Portal_Config__mdt> configs = [
+                SELECT Exclude_Saturday__c
+                FROM Assessment_Portal_Config__mdt
+                LIMIT 1
+            ];
+            excludeSaturday = !configs.isEmpty() && configs[0].Exclude_Saturday__c == true;
+        }
+        return excludeSaturday && attendanceDate != null && isSaturday(attendanceDate);
+    }
+
+    private static Boolean isSaturday(Date attendanceDate) {
+        if (attendanceDate == null) {
             return false;
         }
-        Datetime midnight = Datetime.newInstance(d.year(), d.month(), d.day());
-        return midnight.format('EEEE') == 'Saturday';
+        Datetime midnight = Datetime.newInstance(attendanceDate, Time.newInstance(0, 0, 0, 0));
+        return midnight.format('E') == 'Sat';
     }
 
     private static Integer calculateLateMinutes(String punchType, Attendance_Config__mdt office,
                                                  Attendance_Summary__c summary, Datetime eventTime) {
         Integer diffMinutes = 0;
 
-        if (isSaturday(Date.today())) {
+        // Keep the attendance punch and timestamps, but do not treat it as late
+        // (or let it trigger a deduction) when Saturday exclusion is configured.
+        if (shouldExcludeSaturday(Date.today())) {
             return 0;
         }
 
@@ -356,15 +495,44 @@ public with sharing class AttendanceController {
                 diffMinutes = 0;
             }
 
-        } else if (punchType == 'Lunch Check-In' && summary.Lunch_Out_Time__c != null
+        } else if (punchType == 'Lunch Check-Out' && summary.Lunch_In_Time__c != null
                    && office.Lunch_Duration_Minutes__c != null) {
-            Datetime allowedReturn = summary.Lunch_Out_Time__c.addMinutes(
+            // Lunch started at Lunch_In_Time__c; employee must be back by start + allowed duration
+            Datetime allowedReturn = summary.Lunch_In_Time__c.addMinutes(
                 Integer.valueOf(office.Lunch_Duration_Minutes__c)
             );
             diffMinutes = Integer.valueOf((eventTime.getTime() - allowedReturn.getTime()) / 60000);
         }
 
         return diffMinutes > 0 ? diffMinutes : 0;
+    }
+
+    // Office arrival and late lunch share the first three distinct late dates in a
+    // calendar month. After that grace, each late event is charged independently.
+    @TestVisible
+    private static Boolean isBeyondMonthlyLateGrace(Id employeeId, Date lateDate) {
+        Date monthStart = lateDate.toStartOfMonth();
+        Set<Date> priorLateDates = new Set<Date>();
+
+        for (Attendance_Log__c lateLog : [
+            SELECT Attendance_Summary__r.Date__c
+            FROM Attendance_Log__c
+            WHERE Employee__c = :employeeId
+              AND Is_Valid__c = true
+              AND Late_Minutes__c > 0
+              AND Attendance_Summary__r.Date__c >= :monthStart
+              AND Attendance_Summary__r.Date__c <= :lateDate
+        ]) {
+            Date recordedLateDate = lateLog.Attendance_Summary__r.Date__c;
+            if (shouldExcludeSaturday(recordedLateDate)) {
+                continue;
+            }
+            if (recordedLateDate != lateDate) {
+                priorLateDates.add(recordedLateDate);
+            }
+        }
+
+        return priorLateDates.size() >= MONTHLY_LATE_GRACE_DAYS;
     }
 
     private static void attachPhoto(Id logRecordId, String base64Data, String contentType) {
@@ -397,7 +565,7 @@ public with sharing class AttendanceController {
     private static Attendance_Config__mdt getOfficeConfig() {
         List<Attendance_Config__mdt> configs = [
             SELECT Latitude__c, Longitude__c, Allowed_Radius_Meters__c,
-                   Office_Start_Time__c, Lunch_Duration_Minutes__c, Need_Lunch_Photo__c
+                     Office_Start_Time__c, Lunch_Duration_Minutes__c, Need_Lunch_Photo__c
             FROM Attendance_Config__mdt
             LIMIT 1
         ];
@@ -409,14 +577,19 @@ public with sharing class AttendanceController {
 
     private static Boolean isEligible(String type, Set<String> doneTypes) {
         if (type == 'Office Check-In')  return true;
-        if (type == 'Lunch Check-Out')  return doneTypes.contains('Office Check-In') && !doneTypes.contains('Office Check-Out');
-        if (type == 'Lunch Check-In')   return doneTypes.contains('Lunch Check-Out');
+        // Lunch starts after office check-in, and not once the day is closed
+        if (type == 'Lunch Check-In')   return doneTypes.contains('Office Check-In') && !doneTypes.contains('Office Check-Out');
+        // Lunch ends only after lunch has started
+        if (type == 'Lunch Check-Out')  return doneTypes.contains('Lunch Check-In');
         if (type == 'Office Check-Out') return doneTypes.contains('Office Check-In');
         return false;
     }
 
     private static Boolean needsPhotoFor(String type, Attendance_Config__mdt office) {
-        if (type == 'Office Check-In' || type == 'Office Check-Out') return true;
+        // Photo is mandatory only for Office Check-In. Office Check-Out needs no photo.
+        // Lunch In / Lunch Out follow the Need_Lunch_Photo__c setting in Attendance_Config__mdt.
+        if (type == 'Office Check-In') return true;
+        if (type == 'Office Check-Out') return false;
         return office.Need_Lunch_Photo__c == true;
     }
 

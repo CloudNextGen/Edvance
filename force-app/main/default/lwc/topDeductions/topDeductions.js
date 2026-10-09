@@ -16,7 +16,13 @@ export default class TopDeductions extends LightningElement {
     errorMessage = '';
     wiredDeductionsResult;
 
-    // modal state
+    selectedFilter = '30d'; 
+    startDate = null;
+    endDate = null;
+    customStart = '';
+    customEnd = '';
+
+    // Modal state
     modalType = null; // 'redeem' | 'history' | null
     selected = null;
     amount = '';
@@ -29,8 +35,6 @@ export default class TopDeductions extends LightningElement {
     @track history = [];
     modeOptions = [];
 
-    // true only if user's permission set (Portal HR permission set) includes
-    // the custom permission "Portal HR Access"
     get isHr() {
         return hasHrPermission === true;
     }
@@ -42,7 +46,8 @@ export default class TopDeductions extends LightningElement {
         }
     }
 
-    @wire(getTopDeductionsEmployees)
+    // Reactive wire bound to startDate and endDate
+    @wire(getTopDeductionsEmployees, { startDate: '$startDate', endDate: '$endDate' })
     wiredDeductions(result) {
         this.wiredDeductionsResult = result;
         const { error, data } = result;
@@ -51,7 +56,12 @@ export default class TopDeductions extends LightningElement {
         if (data) {
             this.hasError = false;
             this.errorMessage = '';
-            this.topEmployees = data.map((item, index) => {
+
+            const sorted = [...data].sort(
+                (a, b) => Number(b.remainingAmount || 0) - Number(a.remainingAmount || 0)
+            );
+
+            this.topEmployees = sorted.map((item, index) => {
                 const nameParts = item.employeeName ? item.employeeName.trim().split(' ') : ['E', 'M'];
                 const initials =
                     nameParts.length >= 2
@@ -80,14 +90,120 @@ export default class TopDeductions extends LightningElement {
         }
     }
 
+    /* ---------- Filter Class Getters (Active Highlight) ---------- */
+    get isCustomFilter() {
+        return this.selectedFilter === 'custom';
+    }
+    get filterClassAll() {
+        return this.selectedFilter === 'all' ? 'filter-btn active' : 'filter-btn';
+    }
+    get filterClass7() {
+        return this.selectedFilter === '7d' ? 'filter-btn active' : 'filter-btn';
+    }
+    get filterClass30() {
+        return this.selectedFilter === '30d' ? 'filter-btn active' : 'filter-btn';
+    }
+    get filterClassCustom() {
+        return this.selectedFilter === 'custom' ? 'filter-btn active' : 'filter-btn';
+    }
+
+    handleFilterSelect(event) {
+        const filterType = event.currentTarget.dataset.filter;
+        if (this.selectedFilter === filterType && filterType !== 'custom') return;
+        
+        this.selectedFilter = filterType;
+
+        const today = new Date();
+        const fmtDate = (d) => d.toISOString().slice(0, 10);
+
+        if (filterType === '7d') {
+            this.isLoading = true;
+            const start = new Date();
+            start.setDate(today.getDate() - 7);
+            this.startDate = fmtDate(start);
+            this.endDate = fmtDate(today);
+        } else if (filterType === '30d') {
+            this.isLoading = true;
+            const start = new Date();
+            start.setDate(today.getDate() - 30);
+            this.startDate = fmtDate(start);
+            this.endDate = fmtDate(today);
+        } else if (filterType === 'all') {
+            this.isLoading = true;
+            this.startDate = null;
+            this.endDate = null;
+        } else if (filterType === 'custom') {
+            // Only trigger wire if both are already present and valid
+            if (this.customStart && this.customEnd && this.customStart <= this.customEnd) {
+                this.isLoading = true;
+                this.startDate = this.customStart;
+                this.endDate = this.customEnd;
+            }
+        }
+    }
+
+    handleCustomDateChange(event) {
+        const field = event.target.name;
+        if (field === 'customStart') this.customStart = event.target.value;
+        if (field === 'customEnd') this.customEnd = event.target.value;
+
+        // Guard against single date, inverted ranges, or invalid formats
+        if (this.customStart && this.customEnd) {
+            if (this.customStart > this.customEnd) {
+                this.dispatchEvent(
+                    new ShowToastEvent({
+                        title: 'Invalid Date Range',
+                        message: 'Start date cannot be after end date.',
+                        variant: 'warning'
+                    })
+                );
+                return;
+            }
+            this.isLoading = true;
+            this.startDate = this.customStart;
+            this.endDate = this.customEnd;
+        }
+    }
+
+    /* ---------- Base Getters ---------- */
     get hasResults() {
         return !this.isLoading && !this.hasError && this.topEmployees.length > 0;
     }
+
     get isEmpty() {
         return !this.isLoading && !this.hasError && this.topEmployees.length === 0;
     }
 
-    /* ---------- modal getters ---------- */
+    get ceoEmployee() {
+        return this.topEmployees.length > 0 ? this.topEmployees[0] : null;
+    }
+
+    get otherEmployees() {
+        return this.topEmployees.slice(1);
+    }
+
+    get hasOtherEmployees() {
+        return this.otherEmployees.length > 0;
+    }
+
+    get unsettledLabel() {
+        const count = this.topEmployees.length;
+        return count > 0 ? `${count} Unsettled` : 'All Unsettled';
+    }
+
+    get totalPoolFormatted() {
+        const total = this.topEmployees.reduce(
+            (sum, item) => sum + Number(item.remaining || 0),
+            0
+        );
+        return fmt(total);
+    }
+
+    get topContributorName() {
+        return this.ceoEmployee ? this.ceoEmployee.employeeName : 'None';
+    }
+
+    /* ---------- Modal Getters ---------- */
     get showModal() { return this.modalType !== null; }
     get isRedeemModal() { return this.modalType === 'redeem'; }
     get isHistoryModal() { return this.modalType === 'history'; }
@@ -106,10 +222,10 @@ export default class TopDeductions extends LightningElement {
     get noHistory() { return !this.isHistoryLoading && this.history.length === 0; }
     get saveLabel() { return this.isSaving ? 'Saving...' : 'Confirm payment'; }
 
-    /* ---------- actions ---------- */
+    /* ---------- Actions ---------- */
     handleRedeemClick(event) {
         this.selected = this.topEmployees.find((e) => e.employeeId === event.currentTarget.dataset.id);
-        this.amount = this.selected.remaining; // full amount by default
+        this.amount = this.selected.remaining;
         this.paymentDate = this.todayStr;
         this.paymentMode = '';
         this.remarks = '';
@@ -157,12 +273,18 @@ export default class TopDeductions extends LightningElement {
 
     async handleConfirm() {
         const a = Number(this.amount);
-        if (!a || a <= 0) { this.modalError = 'Enter an amount greater than 0.'; return; }
+        if (!a || a <= 0) { 
+            this.modalError = 'Enter an amount greater than 0.'; 
+            return; 
+        }
         if (a > this.selected.remaining) {
             this.modalError = `Amount cannot exceed ${this.balanceFormatted}.`;
             return;
         }
-        if (!this.paymentDate) { this.modalError = 'Select the payment date.'; return; }
+        if (!this.paymentDate) { 
+            this.modalError = 'Select the payment date.'; 
+            return; 
+        }
 
         this.isSaving = true;
         this.modalError = '';

@@ -1,6 +1,9 @@
 public without sharing class LearningContentController {
     private static final String QUEUE_DEV_NAME = 'Learning_File_Review_Queue';
     private static final String NOTIFICATION_TYPE_DEV_NAME = 'Task_Assigned_to_Queue';
+    private static final String NEXT_ACCESS_LOCKED_MESSAGE = '⚠️ Next file and folder are locked. Please contact your Admin/Mentor for access.';
+    @TestVisible private static Boolean autoAssignNextFileOverride;
+    @TestVisible private static Boolean autoAssignNextFolderOverride;
 
     public class FolderNode {
         @AuraEnabled public String id;
@@ -340,6 +343,27 @@ public without sharing class LearningContentController {
                 throw new AuraHandledException('Unable to update Learning Access: ' + upsertResult.getErrors()[0].getMessage());
             }
 
+            Boolean autoAssignNextFile = autoAssignNextFileOverride;
+            Boolean autoAssignNextFolder = autoAssignNextFolderOverride;
+            if (autoAssignNextFile == null || autoAssignNextFolder == null) {
+                List<Assessment_Portal_Config__mdt> configRecords = [
+                    SELECT Auto_Assign_Next_File__c, Auto_Assign_Next_Folder__c
+                    FROM Assessment_Portal_Config__mdt
+                    LIMIT 1
+                ];
+                if (!configRecords.isEmpty()) {
+                    if (autoAssignNextFile == null) {
+                        autoAssignNextFile = configRecords[0].Auto_Assign_Next_File__c == true;
+                    }
+                    if (autoAssignNextFolder == null) {
+                        autoAssignNextFolder = configRecords[0].Auto_Assign_Next_Folder__c == true;
+                    }
+                } else {
+                    autoAssignNextFile = false;
+                    autoAssignNextFolder = false;
+                }
+            }
+
             // ─── Pull every file in this folder, sorted the same way the UI sorts them ───
             List<Learning_File__c> allFolderFiles = [
                 SELECT Id, Name, Sort_Order__c, Learning_Folder__c, Owner.Name
@@ -394,7 +418,7 @@ public without sharing class LearningContentController {
             System.debug('All Files Completed = ' + allFilesCompletedInFolder);
             System.debug('=============================================================');
 
-            if (!allFilesCompletedInFolder) {
+            if (!allFilesCompletedInFolder && autoAssignNextFile) {
                 // ─── Folder isn't finished yet — grant access to the next file
                 // in sequence (natural sort order) so it appears unlocked. ───
                 Integer currentIndex = -1;
@@ -421,7 +445,7 @@ public without sharing class LearningContentController {
                     applyLearningAccessName(nextAccess, nextFile);
                     Database.SaveResult insertResult = Database.insert(nextAccess, false, AccessLevel.SYSTEM_MODE);
                     if (!insertResult.isSuccess()) {
-                        throw new AuraHandledException('Unable to create next Learning Access: ' + insertResult.getErrors()[0].getMessage());
+                        throw new AuraHandledException(NEXT_ACCESS_LOCKED_MESSAGE);
                     }
                 }
 
@@ -430,7 +454,7 @@ public without sharing class LearningContentController {
                 result.put('nextFileId', nextFile != null ? nextFile.Id : null);
                 result.put('nextFileName', nextFile != null ? nextFile.Name : null);
                 result.put('nextFolderUnlocked', false);
-            } else {
+            } else if (allFilesCompletedInFolder && autoAssignNextFolder) {
                 // ─── Every file in this folder is Completed — unlock the next
                 // content folder anywhere in the tree. ───
 
@@ -498,7 +522,7 @@ public without sharing class LearningContentController {
                         }
 
                         if (!insertResult.isSuccess()) {
-                            throw new AuraHandledException('Unable to unlock next folder: ' + insertResult.getErrors()[0].getMessage());
+                            throw new AuraHandledException(NEXT_ACCESS_LOCKED_MESSAGE);
                         }
                     }
 
@@ -514,6 +538,12 @@ public without sharing class LearningContentController {
                     result.put('nextFileName', null);
                     result.put('nextFolderUnlocked', false);
                 }
+            } else {
+                result.put('success', true);
+                result.put('message', 'File marked complete.');
+                result.put('nextFileId', null);
+                result.put('nextFileName', null);
+                result.put('nextFolderUnlocked', false);
             }
 
             // Include debug payload for clients that cannot read Apex logs
@@ -605,7 +635,10 @@ public without sharing class LearningContentController {
 
         } catch (Exception e) {
             ErrorLogger.log(e);
-            throw new AuraHandledException('Error marking file complete: ' + e.getMessage());
+            String errorMessage = e.getMessage() != null && e.getMessage().contains(NEXT_ACCESS_LOCKED_MESSAGE)
+                ? NEXT_ACCESS_LOCKED_MESSAGE
+                : 'Error marking file complete: ' + e.getMessage();
+            throw new AuraHandledException(errorMessage);
         }
 
         return result;

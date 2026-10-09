@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Auto_Assign_Next_Folder__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>Assign next folder when this checkbox is checked automattically</description>
+    <fieldManageability>DeveloperControlled</fieldManageability>
+    <label>Auto Assign Next Folder</label>
+    <type>Checkbox</type>
+</CustomField>

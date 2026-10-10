@@ -670,16 +670,16 @@ export default class AttendanceCapture extends LightningElement {
             return;
         }
 
-        const headers = ['Date', 'Office In', 'Office Out', 'Lunch In', 'Lunch Out', 'Office Late', 'Lunch Late', 'Deduction', 'Status'];
+        const headers = ['Date', 'Office In', 'Lunch In', 'Lunch Out', 'Office Out', 'Office Late', 'Lunch Late', 'Deduction', 'Status'];
         const csvRows = [headers.join(',')];
 
         this.historyRows.forEach(row => {
             const values = [
                 `"${row.date || ''}"`,
                 `"${row.officeIn || ''}"`,
-                `"${row.officeOut || ''}"`,
                 `"${row.lunchIn || ''}"`,
                 `"${row.lunchOut || ''}"`,
+                `"${row.officeOut || ''}"`,
                 `"${row.officeLateMinutes || ''}"`,
                 `"${row.lunchLateMinutes || ''}"`,
                 `"${row.deduction || 0}"`,

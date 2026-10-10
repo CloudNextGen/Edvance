@@ -27,7 +27,7 @@
       "regions" : [ {
         "components" : [ {
           "componentAttributes" : {
-            "dashboardSubtitle" : "Select a team member to view assignments and results."
+            "dashboardSubtitle" : "Manage team members, assignments, learning files, and attendance in one place."
           },
           "componentName" : "c:adminAssessmentDashboard",
           "id" : "908b6037-00e0-409b-adbc-2058d0164c8f",

@@ -34,6 +34,7 @@ public with sharing class AttendanceController {
     @TestVisible private static Boolean excludeSaturdayOverride;
     @TestVisible private static Id currentContactIdOverride;
     @TestVisible private static Datetime officeCheckInNowOverride;
+    @TestVisible private static BusinessHours defaultBusinessHoursOverride;
 
     // Lunch Check-In = lunch starts, Lunch Check-Out = lunch ends
     private static final List<String> PUNCH_SEQUENCE = new List<String>{
@@ -197,7 +198,9 @@ public with sharing class AttendanceController {
 
             // Office and lunch lateness each have their own monthly three-occurrence grace.
             if (isValid && (punchType == 'Office Check-In' || punchType == 'Lunch Check-Out')) {
-                Integer lateMinutes = calculateLateMinutes(punchType, office, summary, logRec.Event_Timestamp__c);
+                Integer lateMinutes = calculateLateMinutes(
+                    punchType, office, summary, logRec.Event_Timestamp__c, attendanceDate
+                );
                 logRec.Late_Minutes__c = lateMinutes;
                 if (lateMinutes > 0) {
                     logRec.Status__c = 'Not Excused';
@@ -501,24 +504,22 @@ public with sharing class AttendanceController {
         return midnight.format('E') == 'Sat';
     }
 
+    @TestVisible
     private static Integer calculateLateMinutes(String punchType, Attendance_Config__mdt office,
-                                                 Attendance_Summary__c summary, Datetime eventTime) {
+                                                 Attendance_Summary__c summary, Datetime eventTime,
+                                                 Date attendanceDate) {
         Integer diffMinutes = 0;
 
         // Keep the attendance punch and timestamps, but do not treat it as late
         // (or let it trigger a deduction) when Saturday exclusion is configured.
-        if (shouldExcludeSaturday(Date.today())) {
+        if (shouldExcludeSaturday(attendanceDate)) {
             return 0;
         }
 
-        if (punchType == 'Office Check-In' && String.isNotBlank(office.Office_Start_Time__c)) {
-            try {
-                Datetime expectedStart = getOfficeStartDateTime(Date.today(), office);
+        if (punchType == 'Office Check-In') {
+            Datetime expectedStart = getBusinessHoursOpeningDateTime(attendanceDate);
+            if (expectedStart != null) {
                 diffMinutes = Integer.valueOf((eventTime.getTime() - expectedStart.getTime()) / 60000);
-            } catch (Exception e) {
-                ErrorLogger.log(e);
-                // Malformed Office_Start_Time__c in metadata — fail safe to 0 rather than blocking check-in
-                diffMinutes = 0;
             }
 
         } else if (punchType == 'Lunch Check-Out' && summary.Lunch_In_Time__c != null
@@ -531,6 +532,55 @@ public with sharing class AttendanceController {
         }
 
         return diffMinutes > 0 ? diffMinutes : 0;
+    }
+
+    private static Datetime getBusinessHoursOpeningDateTime(Date attendanceDate) {
+        if (attendanceDate == null) {
+            return null;
+        }
+
+        BusinessHours schedule = defaultBusinessHoursOverride;
+        if (schedule == null) {
+            List<BusinessHours> defaultHours = [
+                SELECT TimeZoneSidKey, MondayStartTime, TuesdayStartTime, WednesdayStartTime,
+                       ThursdayStartTime, FridayStartTime, SaturdayStartTime, SundayStartTime
+                FROM BusinessHours
+                WHERE IsDefault = true
+                LIMIT 1
+            ];
+            if (defaultHours.isEmpty()) {
+                return null;
+            }
+            schedule = defaultHours[0];
+        }
+
+        Integer weekday = Integer.valueOf(
+            Math.mod(Date.newInstance(1900, 1, 1).daysBetween(attendanceDate), 7)
+        );
+        Time openingTime;
+        switch on weekday {
+            when 0 { openingTime = schedule.MondayStartTime; }
+            when 1 { openingTime = schedule.TuesdayStartTime; }
+            when 2 { openingTime = schedule.WednesdayStartTime; }
+            when 3 { openingTime = schedule.ThursdayStartTime; }
+            when 4 { openingTime = schedule.FridayStartTime; }
+            when 5 { openingTime = schedule.SaturdayStartTime; }
+            when 6 { openingTime = schedule.SundayStartTime; }
+            when else { return null; }
+        }
+        if (openingTime == null || String.isBlank(schedule.TimeZoneSidKey)) {
+            return null;
+        }
+
+        Datetime wallTimeUtc = Datetime.newInstanceGmt(attendanceDate, openingTime);
+        TimeZone businessTimeZone = TimeZone.getTimeZone(schedule.TimeZoneSidKey);
+        Integer offsetMillis = businessTimeZone.getOffset(wallTimeUtc);
+        Datetime openingDateTime = wallTimeUtc.addSeconds((-offsetMillis) / 1000);
+        Integer adjustedOffsetMillis = businessTimeZone.getOffset(openingDateTime);
+        if (adjustedOffsetMillis != offsetMillis) {
+            openingDateTime = wallTimeUtc.addSeconds((-adjustedOffsetMillis) / 1000);
+        }
+        return openingDateTime;
     }
 
     @TestVisible

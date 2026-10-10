@@ -158,6 +158,9 @@ export default class AttendanceCapture extends LightningElement {
         if (!this.record) {
             return [];
         }
+        const lunchEnded = this.record.entries.some(
+            (entry) => entry.type === 'Lunch Check-Out' && entry.completed
+        );
         return this.record.entries.map((entry) => {
             const isAppealOpen = this.appealOpenForId === entry.id;
             const canAppeal = entry.completed && entry.status === 'Not Excused' && !entry.excusalReason;
@@ -177,6 +180,7 @@ export default class AttendanceCapture extends LightningElement {
                 formattedTime: entry.completed ? this.formatTime(entry.eventTimestamp) : '—',
                 showLunchCountdown: entry.type === 'Lunch Check-In' &&
                     entry.completed &&
+                    !lunchEnded &&
                     this.hasActiveLunchCountdown &&
                     this.lunchCountdownSeconds > 0,
                 lunchCountdownText: entry.type === 'Lunch Check-In'

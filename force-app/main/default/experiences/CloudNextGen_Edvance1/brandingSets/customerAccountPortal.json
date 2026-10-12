@@ -14,7 +14,7 @@
     "HeaderFonts" : "Ek Mukta",
     "LinkColor" : "#1277B7",
     "LoginBackgroundColor" : "#F4F4F4",
-    "LoginBackgroundImage" : "../../../../sfsites/picasso/core/external/salesforceIdentity/images/background.jpg?v=1",
+    "LoginBackgroundImage" : "/file-asset/Login_Background?v=1",
     "NavigationMenuTextColor" : "#222222",
     "OverlayTextColor" : "#FFFFFF",
     "PageBackgroundColor" : "#F5F7FA",

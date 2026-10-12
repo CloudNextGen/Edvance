@@ -44,6 +44,7 @@
     </types>
     <types>
         <members>home_png</members>
+        <members>Login_Background</members>
         <name>ContentAsset</name>
     </types>
     <types>

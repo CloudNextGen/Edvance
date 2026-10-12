@@ -373,7 +373,7 @@ public with sharing class AttendanceController {
             Messaging.CustomNotification notification = new Messaging.CustomNotification();
             notification.setTitle('New attendance appeal');
             notification.setBody(appeal.Employee__r.Name + ' submitted an appeal for ' + appeal.Type__c +
-                ' (' + appeal.Late_Minutes__c + ' minutes late).');
+                ' (' + formatLateDuration(appeal.Late_Minutes__c) + ' late).');
             notification.setNotificationTypeId(notificationTypes[0].Id);
             notification.setTargetId(appeal.Id);
             notification.send(notificationRecipientIds);
@@ -381,6 +381,23 @@ public with sharing class AttendanceController {
             // A notification failure must not prevent the employee from submitting their appeal.
             ErrorLogger.log(e);
         }
+    }
+
+    private static String formatLateDuration(Decimal lateMinutes) {
+        Integer totalMinutes = lateMinutes == null ? 0 : lateMinutes.intValue();
+        Integer hours = totalMinutes / 60;
+        Integer remainingMinutes = totalMinutes - (hours * 60);
+
+        if (hours == 0) {
+            return totalMinutes + (totalMinutes == 1 ? ' minute' : ' minutes');
+        }
+
+        String duration = hours + (hours == 1 ? ' hour' : ' hours');
+        if (remainingMinutes > 0) {
+            duration += ' ' + remainingMinutes +
+                (remainingMinutes == 1 ? ' minute' : ' minutes');
+        }
+        return duration;
     }
 
     @AuraEnabled

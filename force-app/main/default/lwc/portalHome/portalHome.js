@@ -12,10 +12,12 @@ import raiseRequest from '@salesforce/apex/PortalRequestService.raiseRequest';
 const REQUEST_TYPES = ['HR Related Query', 'Manager Related Query'];
 const DEFAULT_HERO_SUBTITLE =
     'Everything you need to check in, learn, complete assignments, and track your onboarding — all in one place.';
+const DEFAULT_WELCOME_MESSAGE = 'Welcome back, {firstName}';
 
 export default class PortalHome extends LightningElement {
     // Configurable from Experience Builder (property panel)
     @api heroSubtitle = DEFAULT_HERO_SUBTITLE;
+    @api welcomeMessage = DEFAULT_WELCOME_MESSAGE;
 
     userId = Id;
     recentFiles = [];
@@ -43,8 +45,9 @@ export default class PortalHome extends LightningElement {
             : '';
     }
 
-    get welcomeMessage() {
-        return this.userFirstName ? `Welcome back, ${this.userFirstName}` : 'Welcome back';
+    get welcomeHeading() {
+        const welcomeMessage = this.welcomeMessage || DEFAULT_WELCOME_MESSAGE;
+        return welcomeMessage.replace('{firstName}', this.userFirstName).replace(/,\s*$/, '');
     }
 
     connectedCallback() {

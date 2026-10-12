@@ -265,6 +265,9 @@
    ════════════════════════════════════════════════════════════════ */
 .users-table-container {
     width: 100%;
+    max-height: 68vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     background: #ffffff;
     border: 1px solid rgba(226, 230, 238, 0.9);
     border-radius: 16px;
@@ -284,6 +287,10 @@
 }
 
 .users-roster-table th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: linear-gradient(180deg, #F9FAFD 0%, #F1F4FA 100%);
     padding: 1.15rem 1.25rem;
     text-align: left;
     border-bottom: 2px solid #E2E6EE;
@@ -530,12 +537,12 @@
 }
 
 .btn-tone-attendance:hover {
-    border-color: #D96B8B;
-    background: #FFF1F5;
+    border-color: #F07B5C;
+    background: #FFF3F0;
 }
 .btn-tone-attendance:hover span, .btn-tone-attendance:hover lightning-icon {
-    color: #BE3A60;
-    --sds-c-icon-color-foreground-default: #BE3A60;
+    color: #D95F42;
+    --sds-c-icon-color-foreground-default: #D95F42;
 }
 
 .admin-action-btn:active {
@@ -659,6 +666,204 @@
 
 .edit-user-panel {
     max-width: 620px;
+}
+
+.create-user-panel {
+    max-width: 760px;
+    padding: 0;
+    overflow-x: hidden;
+}
+
+.user-status-panel {
+    max-width: 720px;
+}
+
+.user-status-mode-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 1.25rem;
+}
+
+.user-status-mode-card {
+    min-height: 150px;
+    padding: 1.25rem;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--white);
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.55rem;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.user-status-mode-card:hover {
+    border-color: var(--violet);
+    box-shadow: 0 8px 20px rgba(124, 111, 212, 0.12);
+    transform: translateY(-2px);
+}
+
+.user-status-mode-card lightning-icon {
+    --slds-c-icon-color-foreground-default: var(--violet);
+}
+
+.user-status-mode-card span {
+    font-weight: 800;
+}
+
+.user-status-mode-card small,
+.user-status-identity span,
+.user-status-identity small {
+    color: var(--ink-soft);
+}
+
+.user-status-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0;
+    border: 0;
+    background: transparent;
+    color: var(--violet);
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.user-status-list-title {
+    margin: 0.75rem 0;
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--ink);
+}
+
+.user-status-search {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0 0.8rem;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--white);
+}
+
+.user-status-search input {
+    width: 100%;
+    min-height: 42px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--ink);
+    font: inherit;
+}
+
+.user-status-count {
+    margin: 0.45rem 0 0;
+    color: var(--ink-soft);
+    font-size: 0.75rem;
+}
+
+.user-status-list {
+    position: relative;
+    min-height: 90px;
+    max-height: 340px;
+    margin-top: 0.8rem;
+    overflow-y: auto;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+}
+
+.user-status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--line);
+}
+
+.user-status-row:last-child {
+    border-bottom: 0;
+}
+
+.user-status-identity {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    overflow-wrap: anywhere;
+}
+
+.user-status-identity strong {
+    color: var(--ink);
+}
+
+.user-status-action {
+    flex: 0 0 auto;
+    border: 0;
+    border-radius: 8px;
+    padding: 0.55rem 0.9rem;
+    color: var(--white);
+    font-size: 0.8rem;
+    font-weight: 750;
+    cursor: pointer;
+}
+
+.user-status-action.activate {
+    background: var(--teal);
+}
+
+.user-status-action.deactivate {
+    background: #C44343;
+}
+
+.user-status-action:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+.user-status-empty {
+    padding: 1.25rem;
+    color: var(--ink-soft);
+    text-align: center;
+}
+
+.user-status-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 1.25rem;
+    color: #A63D3D;
+    text-align: center;
+}
+
+.user-status-error button {
+    border: 0;
+    background: transparent;
+    color: var(--violet);
+    font-weight: 750;
+    cursor: pointer;
+}
+
+.user-status-spinner {
+    position: relative;
+    min-height: 56px;
+}
+
+@media (max-width: 560px) {
+    .user-status-mode-options {
+        grid-template-columns: 1fr;
+    }
+
+    .user-status-panel {
+        padding: 1.5rem;
+    }
 }
 
 .ccu-modal-close {

@@ -17,4 +17,18 @@
         <target>/dashboard</target>
         <type>InternalLink</type>
     </navigationMenuItem>
+    <navigationMenuItem>
+        <label>My Requests</label>
+        <position>3</position>
+        <publiclyAvailable>false</publiclyAvailable>
+        <target>/my-requests</target>
+        <type>InternalLink</type>
+    </navigationMenuItem>
+    <navigationMenuItem>
+        <label>All Request</label>
+        <position>4</position>
+        <publiclyAvailable>false</publiclyAvailable>
+        <target>/all-requests</target>
+        <type>InternalLink</type>
+    </navigationMenuItem>
 </NavigationMenu>

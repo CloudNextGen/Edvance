@@ -1,4 +1,133 @@
 public without sharing class AdminDashboardController {
+
+    private static final Integer USER_STATUS_PAGE_SIZE = 30;
+    private static final Set<String> COMMUNITY_USER_TYPES = new Set<String>{
+        'CspLitePortal',
+        'PowerCustomerSuccess',
+        'PowerPartner'
+    };
+    @TestVisible private static Boolean managePortalUsersAccessOverride;
+
+    public class UserStatusRow {
+        @AuraEnabled public Id id;
+        @AuraEnabled public String name;
+        @AuraEnabled public String email;
+        @AuraEnabled public String username;
+        @AuraEnabled public String contactName;
+        @AuraEnabled public String accountName;
+    }
+
+    public class UserStatusPage {
+        @AuraEnabled public List<UserStatusRow> users;
+        @AuraEnabled public Boolean hasMore;
+    }
+
+    private static void assertCanManagePortalUsers() {
+        if (managePortalUsersAccessOverride != null) {
+            if (!managePortalUsersAccessOverride) {
+                throw new AuraHandledException('Only System Administrators and HR users can manage portal user status.');
+            }
+            return;
+        }
+        if (
+            !LearningAccessAdminController.isCurrentUserSystemAdministrator() &&
+            !FeatureManagement.checkPermission('Portal_HR_Access')
+        ) {
+            throw new AuraHandledException('Only System Administrators and HR users can manage portal user status.');
+        }
+    }
+
+    @AuraEnabled
+    public static UserStatusPage getPortalUsersByStatus(
+        Boolean active,
+        String searchTerm,
+        Integer offsetSize
+    ) {
+        assertCanManagePortalUsers();
+        if (active == null) {
+            throw new AuraHandledException('Choose whether to load active or deactivated users.');
+        }
+
+        Integer resultOffset = offsetSize == null ? 0 : offsetSize;
+        if (resultOffset < 0 || resultOffset > 2000) {
+            throw new AuraHandledException('The user list has reached its maximum scroll depth. Refine your search to find more users.');
+        }
+
+        Integer pageSize = USER_STATUS_PAGE_SIZE;
+        Id currentUserId = UserInfo.getUserId();
+        Map<String, Object> queryBinds = new Map<String, Object>{
+            'active' => active,
+            'currentUserId' => currentUserId,
+            'communityUserTypes' => COMMUNITY_USER_TYPES,
+            'pageSize' => pageSize,
+            'resultOffset' => resultOffset
+        };
+        String query =
+            'SELECT Id, Name, Email, Username, Contact.Name, Contact.Account.Name ' +
+            'FROM User ' +
+            'WHERE IsActive = :active ' +
+            'AND UserType IN :communityUserTypes ' +
+            'AND Id != :currentUserId ';
+        if (!String.isBlank(searchTerm)) {
+            queryBinds.put('searchPattern', '%' + searchTerm.trim() + '%');
+            query +=
+                'AND (Name LIKE :searchPattern OR Email LIKE :searchPattern ' +
+                'OR Username LIKE :searchPattern OR Contact.Name LIKE :searchPattern) ';
+        }
+        query += 'ORDER BY Name ASC, Id ASC LIMIT :pageSize OFFSET :resultOffset';
+        List<User> matchingUsers = (List<User>) Database.queryWithBinds(
+            query,
+            queryBinds,
+            AccessLevel.SYSTEM_MODE
+        );
+
+        UserStatusPage page = new UserStatusPage();
+        page.users = new List<UserStatusRow>();
+        page.hasMore = matchingUsers.size() == USER_STATUS_PAGE_SIZE && resultOffset + matchingUsers.size() < 2000;
+        for (User matchedUser : matchingUsers) {
+            UserStatusRow row = new UserStatusRow();
+            row.id = matchedUser.Id;
+            row.name = matchedUser.Name;
+            row.email = matchedUser.Email;
+            row.username = matchedUser.Username;
+            row.contactName = matchedUser.Contact == null ? null : matchedUser.Contact.Name;
+            row.accountName = matchedUser.Contact == null || matchedUser.Contact.Account == null
+                ? null
+                : matchedUser.Contact.Account.Name;
+            page.users.add(row);
+        }
+        return page;
+    }
+
+    @AuraEnabled
+    public static void setPortalUserActive(Id userId, Boolean active) {
+        assertCanManagePortalUsers();
+        if (userId == null || active == null) {
+            throw new AuraHandledException('A portal user and an activate/deactivate action are required.');
+        }
+
+        List<User> usersToUpdate = [
+            SELECT Id, Name, IsActive
+            FROM User
+            WHERE Id = :userId
+              AND UserType IN :COMMUNITY_USER_TYPES
+              AND Id != :UserInfo.getUserId()
+            LIMIT 1
+        ];
+        if (usersToUpdate.isEmpty()) {
+            throw new AuraHandledException('The selected portal user could not be found.');
+        }
+        User selectedUser = usersToUpdate[0];
+        if (selectedUser.IsActive == active) {
+            throw new AuraHandledException(active ? 'This user is already active.' : 'This user is already deactivated.');
+        }
+
+        selectedUser.IsActive = active;
+        Database.SaveResult saveResult = Database.update(selectedUser, false, AccessLevel.SYSTEM_MODE);
+        if (!saveResult.isSuccess()) {
+            throw new AuraHandledException('Unable to update user status: ' + saveResult.getErrors()[0].getMessage());
+        }
+    }
     
     @AuraEnabled(cacheable=true)
     public static List<Contact> getExperienceUsers() {

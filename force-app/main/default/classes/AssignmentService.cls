@@ -1,9 +1,11 @@
 public class AssignmentService {
     private static final String QUEUE_DEV_NAME = 'Learning_File_Review_Queue';
     private static final String NOTIFICATION_TYPE_DEV_NAME = 'Task_Assigned_to_Queue';
+    private static final String ASSIGNMENT_REQUEST_TYPE = 'Other';
 
     @AuraEnabled(cacheable=true)
     public static List<Category__c> getEligibleCategories() {
+        LearningAccessAdminController.assertTeamMemberAccessAllowed();
         Id userId = UserInfo.getUserId();
         User currentUser = [SELECT ContactId FROM User WHERE Id = :userId LIMIT 1];
         Id contactId = currentUser.ContactId;
@@ -30,31 +32,47 @@ public class AssignmentService {
 
     @AuraEnabled
     public static List<Map<String, Object>> getAssignmentsForCategory(Id categoryId) {
+        LearningAccessAdminController.assertTeamMemberAccessAllowed();
         Id userId = UserInfo.getUserId();
         User currentUser = [SELECT ContactId FROM User WHERE Id = :userId LIMIT 1];
         Id contactId = currentUser.ContactId;
 
         List<Assignment__c> allAssignments = [
-            SELECT Id, Name, Total_Question_Count__c,Time_Limit_Minutes__c 
+            SELECT Id, Name, Total_Question_Count__c, Time_Limit_Minutes__c, Sequence__c
             FROM Assignment__c
-            WHERE Category__c = :categoryId ORDER BY Sequence__c ASC
+            WHERE Category__c = :categoryId
+            WITH SYSTEM_MODE
+            ORDER BY Sequence__c ASC
         ];
+        Boolean autoCreateEligibility = isAutoCreateAssignmentEligibilityEnabled();
 
         // Map assignment Id -> real Eligibility_Status__c value, not just a boolean.
         // Possible values seen here: 'Eligible', 'Completed', 'In Progress' (if you use it).
         // Anything NOT in this map means the user has no eligibility record at all
         // for that assignment, which we treat as 'Locked' on the UI side.
         Map<Id, String> statusByAssignmentId = new Map<Id, String>();
+        Map<Id, Id> eligibilityIdByAssignmentId = new Map<Id, Id>();
         if (contactId != null) {
             for (Assignment_Eligibility__c eligibility : [
-                SELECT Assignment__c, Eligibility_Status__c
+                SELECT Id, Assignment__c, Eligibility_Status__c
                 FROM Assignment_Eligibility__c
                 WHERE Contact__c = :contactId
                 AND Assignment__r.Category__c = :categoryId
                 AND Eligibility_Status__c IN ('Eligible', 'Completed', 'In Progress')
+                WITH SYSTEM_MODE
             ]) {
                 statusByAssignmentId.put(eligibility.Assignment__c, eligibility.Eligibility_Status__c);
+                eligibilityIdByAssignmentId.put(eligibility.Assignment__c, eligibility.Id);
             }
+        }
+
+        Id nextAssignmentToRequestId;
+        if (contactId != null && !autoCreateEligibility) {
+            nextAssignmentToRequestId = getNextPassedAssignmentId(
+                allAssignments,
+                statusByAssignmentId,
+                eligibilityIdByAssignmentId
+            );
         }
 
         List<Map<String, Object>> assignmentsWithStatus = new List<Map<String, Object>>();
@@ -71,6 +89,8 @@ public class AssignmentService {
                 rawStatus = 'Eligible';
             } else if (statusByAssignmentId.containsKey(asm.Id)) {
                 rawStatus = statusByAssignmentId.get(asm.Id);
+            } else if (asm.Id == nextAssignmentToRequestId) {
+                rawStatus = 'RequestAccess';
             } else {
                 continue;
             }
@@ -79,6 +99,13 @@ public class AssignmentService {
             // Keep isDisabled for backward compatibility with existing button disabled binding.
             // Anything other than 'Eligible' should be unclickable.
             asmMap.put('isDisabled', rawStatus != 'Eligible');
+            asmMap.put('isRequestAccessStatus', rawStatus == 'RequestAccess');
+
+            if (rawStatus == 'RequestAccess') {
+                Map<String, Object> requestStatus = getAssignmentAccessRequestStatus(contactId, asm.Id);
+                asmMap.put('accessRequestAlreadySubmitted', requestStatus.get('alreadyRequested'));
+                asmMap.put('accessRequestCanNotifyAgain', requestStatus.get('canNotifyAgain'));
+            }
 
             assignmentsWithStatus.add(asmMap);
         }
@@ -86,8 +113,321 @@ public class AssignmentService {
         return assignmentsWithStatus;
     }
 
+    @AuraEnabled
+    public static Map<String, Object> requestNextAssignmentAccess(Id assignmentId) {
+        if (assignmentId == null) {
+            throw new AuraHandledException('The assignment to request is required.');
+        }
+
+        Id contactId = getCurrentContactIdForFeedback();
+        if (contactId == null) {
+            throw new AuraHandledException('Your community user is not linked to a Contact.');
+        }
+        if (isAutoCreateAssignmentEligibilityEnabled()) {
+            throw new AuraHandledException('Assignment access requests are unavailable while automatic eligibility is enabled.');
+        }
+
+        List<Assignment__c> requestedAssignments = [
+            SELECT Id, Name, Category__c, Sequence__c
+            FROM Assignment__c
+            WHERE Id = :assignmentId
+            WITH SYSTEM_MODE
+            LIMIT 1
+        ];
+        if (requestedAssignments.isEmpty()) {
+            throw new AuraHandledException('The requested assignment could not be found.');
+        }
+        Assignment__c requestedAssignment = requestedAssignments[0];
+
+        List<Assignment__c> categoryAssignments = [
+            SELECT Id, Name, Sequence__c
+            FROM Assignment__c
+            WHERE Category__c = :requestedAssignment.Category__c
+            WITH SYSTEM_MODE
+            ORDER BY Sequence__c ASC NULLS LAST
+        ];
+        Map<Id, String> statusByAssignmentId = new Map<Id, String>();
+        Map<Id, Id> eligibilityIdByAssignmentId = new Map<Id, Id>();
+        for (Assignment_Eligibility__c eligibility : [
+            SELECT Id, Assignment__c, Eligibility_Status__c
+            FROM Assignment_Eligibility__c
+            WHERE Contact__c = :contactId
+              AND Assignment__r.Category__c = :requestedAssignment.Category__c
+              AND Eligibility_Status__c IN ('Eligible', 'Completed', 'In Progress')
+            WITH SYSTEM_MODE
+        ]) {
+            statusByAssignmentId.put(eligibility.Assignment__c, eligibility.Eligibility_Status__c);
+            eligibilityIdByAssignmentId.put(eligibility.Assignment__c, eligibility.Id);
+        }
+        if (getNextPassedAssignmentId(
+            categoryAssignments,
+            statusByAssignmentId,
+            eligibilityIdByAssignmentId
+        ) != assignmentId) {
+            throw new AuraHandledException('You can request the next assignment only after passing the preceding assignment.');
+        }
+
+        List<Contact> learners = [
+            SELECT Id, Name, Mentor__c
+            FROM Contact
+            WHERE Id = :contactId
+            WITH SYSTEM_MODE
+            LIMIT 1
+        ];
+        if (learners.isEmpty() || learners[0].Mentor__c == null) {
+            throw new AuraHandledException('No mentor is assigned to your Contact. Please contact your administrator.');
+        }
+        List<User> mentors = [
+            SELECT Id, Email
+            FROM User
+            WHERE Id = :learners[0].Mentor__c AND IsActive = true
+            WITH SYSTEM_MODE
+            LIMIT 1
+        ];
+        if (mentors.isEmpty()) {
+            throw new AuraHandledException('Your assigned mentor is inactive. Please contact your administrator.');
+        }
+
+        Id queueId = getFeedbackQueueId();
+        if (queueId == null) {
+            throw new AuraHandledException('The assignment review queue is not configured.');
+        }
+        String subject = buildAssignmentAccessRequestSubject(requestedAssignment);
+        List<Case> existingRequests = [
+            SELECT Id, Status
+            FROM Case
+            WHERE ContactId = :contactId
+              AND Type = :ASSIGNMENT_REQUEST_TYPE
+              AND Subject = :subject
+            WITH SYSTEM_MODE
+            ORDER BY CreatedDate DESC
+            LIMIT 1
+        ];
+        if (!existingRequests.isEmpty()) {
+            if (existingRequests[0].Status == 'New') {
+                String notificationMessage = notifyMentorOfAssignmentAccessRequest(
+                    mentors[0],
+                    existingRequests[0].Id,
+                    learners[0].Name,
+                    requestedAssignment.Name
+                );
+                return new Map<String, Object>{
+                    'success' => true,
+                    'caseId' => existingRequests[0].Id,
+                    'alreadyRequested' => true,
+                    'canNotifyAgain' => true,
+                    'message' => notificationMessage
+                };
+            }
+            return new Map<String, Object>{
+                'success' => true,
+                'caseId' => existingRequests[0].Id,
+                'alreadyRequested' => true,
+                'canNotifyAgain' => false,
+                'message' => 'You have already submitted an access request for "' + requestedAssignment.Name + '".'
+            };
+        }
+
+        Case accessRequest = new Case(
+            ContactId = contactId,
+            OwnerId = queueId,
+            Subject = subject,
+            Type = ASSIGNMENT_REQUEST_TYPE,
+            Status = 'New',
+            Description = learners[0].Name + ' passed the preceding assignment and is requesting access to "' +
+                requestedAssignment.Name + '".'
+        );
+        Database.SaveResult saveResult = Database.insert(accessRequest, false, AccessLevel.SYSTEM_MODE);
+        if (!saveResult.isSuccess()) {
+            throw new AuraHandledException('Unable to submit the assignment access request: ' +
+                saveResult.getErrors()[0].getMessage());
+        }
+
+        return new Map<String, Object>{
+            'success' => true,
+            'caseId' => saveResult.getId(),
+            'alreadyRequested' => false,
+            'canNotifyAgain' => true,
+            'message' => notifyMentorOfAssignmentAccessRequest(
+                mentors[0],
+                saveResult.getId(),
+                learners[0].Name,
+                requestedAssignment.Name
+            )
+        };
+    }
+
+    private static Boolean isAutoCreateAssignmentEligibilityEnabled() {
+        List<Assessment_Portal_Config__mdt> settings = [
+            SELECT Auto_Create_Assignment_Eligibility__c
+            FROM Assessment_Portal_Config__mdt
+            WITH SYSTEM_MODE
+            LIMIT 1
+        ];
+        return !settings.isEmpty() && settings[0].Auto_Create_Assignment_Eligibility__c == true;
+    }
+
+    private static Id getNextPassedAssignmentId(
+        List<Assignment__c> orderedAssignments,
+        Map<Id, String> statusByAssignmentId,
+        Map<Id, Id> eligibilityIdByAssignmentId
+    ) {
+        Set<Id> completedEligibilityIds = new Set<Id>();
+        for (Assignment__c assignment : orderedAssignments) {
+            if (statusByAssignmentId.get(assignment.Id) == 'Completed' &&
+                eligibilityIdByAssignmentId.containsKey(assignment.Id)) {
+                completedEligibilityIds.add(eligibilityIdByAssignmentId.get(assignment.Id));
+            }
+        }
+        if (completedEligibilityIds.isEmpty()) {
+            return null;
+        }
+
+        Map<Id, String> latestResultByEligibilityId = new Map<Id, String>();
+        for (User_Submission__c submission : [
+            SELECT Assignment_Eligibility__c, Pass_Fail_Status__c
+            FROM User_Submission__c
+            WHERE Assignment_Eligibility__c IN :completedEligibilityIds
+            WITH SYSTEM_MODE
+            ORDER BY CreatedDate DESC, Attempt_Number__c DESC
+        ]) {
+            if (!latestResultByEligibilityId.containsKey(submission.Assignment_Eligibility__c)) {
+                latestResultByEligibilityId.put(
+                    submission.Assignment_Eligibility__c,
+                    submission.Pass_Fail_Status__c
+                );
+            }
+        }
+
+        Decimal highestPassedSequence;
+        for (Assignment__c assignment : orderedAssignments) {
+            Id eligibilityId = eligibilityIdByAssignmentId.get(assignment.Id);
+            if (eligibilityId != null &&
+                statusByAssignmentId.get(assignment.Id) == 'Completed' &&
+                latestResultByEligibilityId.get(eligibilityId) == 'Pass' &&
+                (highestPassedSequence == null || assignment.Sequence__c > highestPassedSequence)) {
+                highestPassedSequence = assignment.Sequence__c;
+            }
+        }
+        if (highestPassedSequence == null) {
+            return null;
+        }
+
+        for (Assignment__c assignment : orderedAssignments) {
+            if (assignment.Sequence__c != null && assignment.Sequence__c > highestPassedSequence) {
+                return statusByAssignmentId.containsKey(assignment.Id) ? null : assignment.Id;
+            }
+        }
+        return null;
+    }
+
+    private static Map<String, Object> getAssignmentAccessRequestStatus(Id contactId, Id assignmentId) {
+        Assignment__c assignment = [
+            SELECT Id, Name
+            FROM Assignment__c
+            WHERE Id = :assignmentId
+            WITH SYSTEM_MODE
+            LIMIT 1
+        ];
+        String subject = buildAssignmentAccessRequestSubject(assignment);
+        List<Case> requests = [
+            SELECT Id, Status
+            FROM Case
+            WHERE ContactId = :contactId
+              AND Type = :ASSIGNMENT_REQUEST_TYPE
+              AND Subject = :subject
+            WITH SYSTEM_MODE
+            ORDER BY CreatedDate DESC
+            LIMIT 1
+        ];
+        Boolean alreadyRequested = !requests.isEmpty();
+        String requestStatus = alreadyRequested ? requests[0].Status : null;
+        return new Map<String, Object>{
+            'alreadyRequested' => alreadyRequested,
+            'requestStatus' => requestStatus,
+            'canNotifyAgain' => requestStatus == 'New'
+        };
+    }
+
+    private static String buildAssignmentAccessRequestSubject(Assignment__c assignment) {
+        return 'Assignment Access Request: ' + assignment.Name;
+    }
+
+    private static String notifyMentorOfAssignmentAccessRequest(
+        User mentor,
+        Id caseId,
+        String learnerName,
+        String assignmentName
+    ) {
+        List<String> sentChannels = new List<String>();
+        List<String> notificationErrors = new List<String>();
+        try {
+            List<CustomNotificationType> notificationTypes = [
+                SELECT Id
+                FROM CustomNotificationType
+                WHERE DeveloperName = :NOTIFICATION_TYPE_DEV_NAME
+                WITH SYSTEM_MODE
+                LIMIT 1
+            ];
+            if (!notificationTypes.isEmpty()) {
+                Messaging.CustomNotification notification = new Messaging.CustomNotification();
+                notification.setTitle('Assignment Access Requested');
+                notification.setBody(learnerName + ' is requesting access to "' + assignmentName + '".');
+                notification.setNotificationTypeId(notificationTypes[0].Id);
+                notification.setTargetId(caseId);
+                notification.send(new Set<String>{ String.valueOf(mentor.Id) });
+                sentChannels.add('Salesforce notification');
+            } else {
+                notificationErrors.add('The Salesforce notification type is not configured.');
+            }
+        } catch (Exception e) {
+            ErrorLogger.log(e);
+            notificationErrors.add('Salesforce notification could not be sent: ' + e.getMessage());
+        }
+
+        try {
+            if (String.isBlank(mentor.Email)) {
+                notificationErrors.add('The mentor does not have an email address.');
+            } else {
+                Messaging.SingleEmailMessage email = new Messaging.SingleEmailMessage();
+                email.setToAddresses(new List<String>{ mentor.Email });
+                email.setSubject('Assignment access requested by ' + learnerName);
+                email.setPlainTextBody(
+                    learnerName + ' is requesting access to "' + assignmentName + '".\n\n' +
+                    'Review the request in Salesforce: ' +
+                    URL.getOrgDomainUrl().toExternalForm() + '/' + caseId
+                );
+                email.setSaveAsActivity(false);
+                Messaging.SendEmailResult[] results = Messaging.sendEmail(
+                    new List<Messaging.SingleEmailMessage>{ email },
+                    false
+                );
+                if (!results.isEmpty() && results[0].isSuccess()) {
+                    sentChannels.add('email');
+                } else {
+                    notificationErrors.add('Mentor email could not be sent.');
+                }
+            }
+        } catch (Exception e) {
+            ErrorLogger.log(e);
+            notificationErrors.add('Mentor email could not be sent: ' + e.getMessage());
+        }
+
+        String message = 'Your request for "' + assignmentName + '" was recorded.';
+        if (!sentChannels.isEmpty()) {
+            message += ' Mentor notified by ' + String.join(sentChannels, ' and ') + '.';
+        }
+        if (!notificationErrors.isEmpty()) {
+            String errors = String.join(notificationErrors, ' ');
+            ErrorLogger.log(errors);
+            message += ' ' + errors;
+        }
+        return message;
+    }
+
     @AuraEnabled(cacheable=true)
     public static List<Assignment_Question__c> getAssignmentQuestions(Id assignmentId) {
+        LearningAccessAdminController.assertTeamMemberAccessAllowed();
         return [
             SELECT Id, Question_Text__c, Max_Points__c
             FROM Assignment_Question__c
@@ -103,6 +443,7 @@ public class AssignmentService {
     @AuraEnabled
     public static Id submitAssignment(Id assignmentId, String answersJson,  Boolean isLocked, String lockReason, Integer violationCount) {
         try {
+            LearningAccessAdminController.assertTeamMemberAccessAllowed();
             Map<Id, String> answersMap = (Map<Id, String>) JSON.deserialize(answersJson, Map<Id, String>.class);
 
             Id userId = UserInfo.getUserId();
@@ -264,6 +605,7 @@ public class AssignmentService {
      */
     @AuraEnabled
     public static List<Map<String, Object>> getSubmissionAttempts(Id assignmentId) {
+        LearningAccessAdminController.assertTeamMemberAccessAllowed();
         List<Map<String, Object>> attempts = new List<Map<String, Object>>();
 
         Id userId = UserInfo.getUserId();
@@ -329,6 +671,7 @@ public class AssignmentService {
      */
     @AuraEnabled
     public static List<Map<String, Object>> getSubmissionDetail(Id submissionId) {
+        LearningAccessAdminController.assertTeamMemberAccessAllowed();
         List<Question_Response__c> responses = [
             SELECT Id, User_Answer__c, AI_Grade__c,
                    Assignment_Question__r.Question_Text__c,
@@ -371,6 +714,7 @@ public class AssignmentService {
     public static Map<String, Object> submitAssessmentFeedback(Id submissionId, String commentText) {
         Map<String, Object> result = new Map<String, Object>();
         try {
+            LearningAccessAdminController.assertTeamMemberAccessAllowed();
             if (submissionId == null) {
                 AuraHandledException AuraExc = new AuraHandledException('Submission Id is required');
                 AuraExc.setMessage('Submission Id is required');
@@ -438,6 +782,7 @@ public class AssignmentService {
     public static Map<String, Object> submitQuestionFeedback(Id assignmentQuestionId, String commentText) {
         Map<String, Object> result = new Map<String, Object>();
         try {
+            LearningAccessAdminController.assertTeamMemberAccessAllowed();
             if (assignmentQuestionId == null) {
                 AuraHandledException AuraExc = new AuraHandledException('Question Id is required');
                 AuraExc.setMessage('Question Id is required');
@@ -563,7 +908,6 @@ public class AssignmentService {
 
         } catch (Exception e) {
             ErrorLogger.log(e);
-            System.debug(LoggingLevel.ERROR, 'Notification send failed: ' + e.getMessage());
         }
     }
 

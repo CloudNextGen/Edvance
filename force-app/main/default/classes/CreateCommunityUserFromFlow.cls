@@ -1,9 +1,91 @@
 public without sharing class CreateCommunityUserFromFlow {
 
+    public class DefaultLookupUsers {
+        @AuraEnabled public Id hrId { get; set; }
+        @AuraEnabled public Id managerId { get; set; }
+        @AuraEnabled public Id mentorId { get; set; }
+        @AuraEnabled public String warningMessage { get; set; }
+    }
+
     private static final Set<String> ALLOWED_USER_TYPES = new Set<String>{
+        'HR',
         'Mentor',
         'Team Member'
     };
+
+    @AuraEnabled
+    public static DefaultLookupUsers getDefaultLookupUsers() {
+        DefaultLookupUsers defaults = new DefaultLookupUsers();
+        Attendance_Config__mdt config = Attendance_Config__mdt.getInstance('Office');
+
+        if (config == null) {
+            defaults.warningMessage =
+                'Attendance Config metadata is missing. No lookup defaults were loaded.';
+            return defaults;
+        }
+
+        Map<String, String> configuredEmailsByRole = new Map<String, String>{
+            'HR' => config.HR_Email__c,
+            'Manager' => config.Manager_Email__c,
+            'Mentor' => config.Mentor_Email__c
+        };
+        Set<String> configuredEmails = new Set<String>();
+        for (String configuredEmail : configuredEmailsByRole.values()) {
+            if (!String.isBlank(configuredEmail)) {
+                configuredEmails.add(configuredEmail.trim());
+            }
+        }
+
+        if (configuredEmails.isEmpty()) {
+            return defaults;
+        }
+
+        Map<String, Id> userIdsByEmail = new Map<String, Id>();
+        for (User configuredUser : [
+            SELECT Id, Email
+            FROM User
+            WHERE IsActive = true AND Email IN :configuredEmails
+            WITH SYSTEM_MODE
+            ORDER BY CreatedDate ASC
+        ]) {
+            String emailKey = configuredUser.Email == null
+                ? null
+                : configuredUser.Email.trim().toLowerCase();
+            if (emailKey != null && !userIdsByEmail.containsKey(emailKey)) {
+                userIdsByEmail.put(emailKey, configuredUser.Id);
+            }
+        }
+
+        List<String> unresolvedRoles = new List<String>();
+        for (String role : configuredEmailsByRole.keySet()) {
+            String configuredEmail = configuredEmailsByRole.get(role);
+            if (String.isBlank(configuredEmail)) {
+                continue;
+            }
+
+            Id configuredUserId = userIdsByEmail.get(configuredEmail.trim().toLowerCase());
+            if (configuredUserId == null) {
+                unresolvedRoles.add(role);
+                continue;
+            }
+
+            if (role == 'HR') {
+                defaults.hrId = configuredUserId;
+            } else if (role == 'Manager') {
+                defaults.managerId = configuredUserId;
+            } else if (role == 'Mentor') {
+                defaults.mentorId = configuredUserId;
+            }
+        }
+
+        if (!unresolvedRoles.isEmpty()) {
+            defaults.warningMessage =
+                'No active user was found for the configured email on: ' +
+                String.join(unresolvedRoles, ', ') +
+                '. Check the email values in Attendance Config metadata.';
+        }
+        return defaults;
+    }
 
     @AuraEnabled
     public static String createContactAndUser(

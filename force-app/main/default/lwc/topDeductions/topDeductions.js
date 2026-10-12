@@ -1,6 +1,8 @@
 import { LightningElement, track, wire } from 'lwc';
 import { refreshApex } from '@salesforce/apex';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import { APPLICATION_SCOPE, MessageContext, subscribe, unsubscribe } from 'lightning/messageService';
+import ATTENDANCE_DEDUCTION_REFRESH from '@salesforce/messageChannel/Attendance_Deduction_Refresh__c';
 import getTopDeductionsEmployees from '@salesforce/apex/AttendanceDeductionController.getTopDeductionsEmployees';
 import hasHrPermission from '@salesforce/customPermission/Portal_HR_Access';
 import getPaymentModes from '@salesforce/apex/AttendanceDeductionController.getPaymentModes';
@@ -15,6 +17,8 @@ export default class TopDeductions extends LightningElement {
     hasError = false;
     errorMessage = '';
     wiredDeductionsResult;
+    messageSubscription;
+    @wire(MessageContext) messageContext;
 
     selectedFilter = '30d'; 
     startDate = null;
@@ -43,6 +47,42 @@ export default class TopDeductions extends LightningElement {
     wiredModes({ data }) {
         if (data) {
             this.modeOptions = data.map((m) => ({ label: m, value: m }));
+        }
+    }
+
+    renderedCallback() {
+        if (!this.messageSubscription && this.messageContext) {
+            this.messageSubscription = subscribe(
+                this.messageContext,
+                ATTENDANCE_DEDUCTION_REFRESH,
+                () => this.refreshAfterAppealReview(),
+                { scope: APPLICATION_SCOPE }
+            );
+        }
+    }
+
+    disconnectedCallback() {
+        if (this.messageSubscription) {
+            unsubscribe(this.messageSubscription);
+            this.messageSubscription = null;
+        }
+    }
+
+    async refreshAfterAppealReview() {
+        if (!this.wiredDeductionsResult) return;
+        try {
+            await refreshApex(this.wiredDeductionsResult);
+        } catch (error) {
+            this.hasError = true;
+            this.errorMessage =
+                error?.body?.message || error?.message || 'Failed to refresh deductions after appeal review.';
+            this.dispatchEvent(
+                new ShowToastEvent({
+                    title: 'Refresh failed',
+                    message: this.errorMessage,
+                    variant: 'error'
+                })
+            );
         }
     }
 
@@ -107,6 +147,16 @@ export default class TopDeductions extends LightningElement {
         return this.selectedFilter === 'custom' ? 'filter-btn active' : 'filter-btn';
     }
 
+    setDateRange(startDate, endDate) {
+        if (this.startDate === startDate && this.endDate === endDate) {
+            return;
+        }
+
+        this.isLoading = true;
+        this.startDate = startDate;
+        this.endDate = endDate;
+    }
+
     handleFilterSelect(event) {
         const filterType = event.currentTarget.dataset.filter;
         if (this.selectedFilter === filterType && filterType !== 'custom') return;
@@ -117,27 +167,19 @@ export default class TopDeductions extends LightningElement {
         const fmtDate = (d) => d.toISOString().slice(0, 10);
 
         if (filterType === '7d') {
-            this.isLoading = true;
             const start = new Date();
             start.setDate(today.getDate() - 7);
-            this.startDate = fmtDate(start);
-            this.endDate = fmtDate(today);
+            this.setDateRange(fmtDate(start), fmtDate(today));
         } else if (filterType === '30d') {
-            this.isLoading = true;
             const start = new Date();
             start.setDate(today.getDate() - 30);
-            this.startDate = fmtDate(start);
-            this.endDate = fmtDate(today);
+            this.setDateRange(fmtDate(start), fmtDate(today));
         } else if (filterType === 'all') {
-            this.isLoading = true;
-            this.startDate = null;
-            this.endDate = null;
+            this.setDateRange(null, null);
         } else if (filterType === 'custom') {
             // Only trigger wire if both are already present and valid
             if (this.customStart && this.customEnd && this.customStart <= this.customEnd) {
-                this.isLoading = true;
-                this.startDate = this.customStart;
-                this.endDate = this.customEnd;
+                this.setDateRange(this.customStart, this.customEnd);
             }
         }
     }
@@ -159,9 +201,7 @@ export default class TopDeductions extends LightningElement {
                 );
                 return;
             }
-            this.isLoading = true;
-            this.startDate = this.customStart;
-            this.endDate = this.customEnd;
+            this.setDateRange(this.customStart, this.customEnd);
         }
     }
 
@@ -320,8 +360,7 @@ export default class TopDeductions extends LightningElement {
             refreshApex(this.wiredDeductionsResult)
                 .catch((error) => {
                     this.hasError = true;
-                    this.errorMessage = 'Error refreshing data.';
-                    console.error('Refresh Error:', error);
+                    this.errorMessage = error.body?.message || error.message || 'Error refreshing data.';
                 })
                 .finally(() => { this.isLoading = false; });
         } else {

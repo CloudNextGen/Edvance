@@ -1,0 +1,13 @@
+<template>
+    <template if:true={showRedirectMessage}>
+        <div class="router-message" role="status">
+            <template if:true={isChecking}>
+                <lightning-spinner alternative-text="Opening notification destination" size="small"></lightning-spinner>
+                <span>Opening the related portal page...</span>
+            </template>
+            <template if:true={routingError}>
+                <span class="router-error">{routingError}</span>
+            </template>
+        </div>
+    </template>
+</template>

@@ -1,9 +1,21 @@
 public without sharing class LearningContentController {
     private static final String QUEUE_DEV_NAME = 'Learning_File_Review_Queue';
     private static final String NOTIFICATION_TYPE_DEV_NAME = 'Task_Assigned_to_Queue';
+    private static final String MENTOR_PERMISSION = 'Portal_Mentor_Access';
+    private static final Set<String> SYSTEM_ADMIN_PERMISSIONS = new Set<String>{
+        'Assign_Files',
+        'View_Assignments',
+        'View_Attendance',
+        'Portal_HR_Access',
+        'Portal_Mentor_Access',
+        'Portal_Team_Member_Access'
+    };
     private static final String NEXT_ACCESS_LOCKED_MESSAGE = '⚠️ Next file and folder are locked. Please contact your Admin/Mentor for access.';
     @TestVisible private static Boolean autoAssignNextFileOverride;
     @TestVisible private static Boolean autoAssignNextFolderOverride;
+    private static Id learningRequestQueueId;
+    private static Map<Id, Boolean> mentorAccessByUserId = new Map<Id, Boolean>();
+    @TestVisible private static Boolean autoCreateAssignmentEligibilityOverride;
 
     public class FolderNode {
         @AuraEnabled public String id;
@@ -90,6 +102,115 @@ public without sharing class LearningContentController {
         }
     }
 
+    private class FolderNaturalComparator implements Comparator<Learning_Folder__c> {
+        public Integer compare(Learning_Folder__c a, Learning_Folder__c b) {
+            Decimal aOrder = a.Sort_Order__c;
+            Decimal bOrder = b.Sort_Order__c;
+            if (aOrder != null && bOrder != null && aOrder != bOrder) {
+                return aOrder > bOrder ? 1 : -1;
+            }
+            if (aOrder != null && bOrder == null) return -1;
+            if (aOrder == null && bOrder != null) return 1;
+
+            String aKey = naturalSortKey(a.Name);
+            String bKey = naturalSortKey(b.Name);
+            if (aKey < bKey) return -1;
+            if (aKey > bKey) return 1;
+            return 0;
+        }
+    }
+
+    private static Boolean hasMentorOrAdminAccess(User assignedMentor) {
+        if (assignedMentor == null || !assignedMentor.IsActive) {
+            return false;
+        }
+        if (mentorAccessByUserId.containsKey(assignedMentor.Id)) {
+            return mentorAccessByUserId.get(assignedMentor.Id);
+        }
+
+        Boolean hasAccess = calculateMentorOrAdminAccess(assignedMentor);
+        mentorAccessByUserId.put(assignedMentor.Id, hasAccess);
+        return hasAccess;
+    }
+
+    private static Boolean calculateMentorOrAdminAccess(User assignedMentor) {
+        Set<String> relevantPermissions = new Set<String>(SYSTEM_ADMIN_PERMISSIONS);
+        relevantPermissions.add(MENTOR_PERMISSION);
+        Map<Id, String> permissionNamesById = new Map<Id, String>();
+        for (CustomPermission permission : [
+            SELECT Id, DeveloperName
+            FROM CustomPermission
+            WHERE DeveloperName IN :relevantPermissions
+            WITH SYSTEM_MODE
+        ]) {
+            permissionNamesById.put(permission.Id, permission.DeveloperName);
+        }
+        if (permissionNamesById.isEmpty()) {
+            return false;
+        }
+
+        Set<Id> permissionSetIds = new Set<Id>();
+        for (PermissionSet profilePermissionSet : [
+            SELECT Id
+            FROM PermissionSet
+            WHERE ProfileId = :assignedMentor.ProfileId
+            WITH SYSTEM_MODE
+        ]) {
+            permissionSetIds.add(profilePermissionSet.Id);
+        }
+
+        Set<Id> permissionSetGroupIds = new Set<Id>();
+        for (PermissionSetAssignment assignment : [
+            SELECT PermissionSetId, PermissionSetGroupId
+            FROM PermissionSetAssignment
+            WHERE AssigneeId = :assignedMentor.Id
+            WITH SYSTEM_MODE
+        ]) {
+            if (assignment.PermissionSetId != null) {
+                permissionSetIds.add(assignment.PermissionSetId);
+            }
+            if (assignment.PermissionSetGroupId != null) {
+                permissionSetGroupIds.add(assignment.PermissionSetGroupId);
+            }
+        }
+
+        if (!permissionSetGroupIds.isEmpty()) {
+            for (PermissionSetGroupComponent component : [
+                SELECT PermissionSetId
+                FROM PermissionSetGroupComponent
+                WHERE PermissionSetGroupId IN :permissionSetGroupIds
+                WITH SYSTEM_MODE
+            ]) {
+                permissionSetIds.add(component.PermissionSetId);
+            }
+        }
+
+        if (permissionSetIds.isEmpty()) {
+            return false;
+        }
+
+        Set<String> grantedPermissions = new Set<String>();
+        for (SetupEntityAccess access : [
+            SELECT ParentId, SetupEntityId
+            FROM SetupEntityAccess
+            WHERE ParentId IN :permissionSetIds
+              AND SetupEntityId IN :permissionNamesById.keySet()
+            WITH SYSTEM_MODE
+        ]) {
+            grantedPermissions.add(permissionNamesById.get(access.SetupEntityId));
+        }
+
+        if (grantedPermissions.contains(MENTOR_PERMISSION)) {
+            return true;
+        }
+        for (String adminPermission : SYSTEM_ADMIN_PERMISSIONS) {
+            if (!grantedPermissions.contains(adminPermission)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static String buildLearningAccessName(String fileName, String userName) {
         String safeFileName = String.isBlank(fileName) ? 'Learning File' : fileName;
         String safeUserName = String.isBlank(userName) ? 'Unknown User' : userName;
@@ -111,6 +232,7 @@ public without sharing class LearningContentController {
 
     @AuraEnabled
     public static List<FolderNode> getLearningContentTree() {
+        LearningAccessAdminController.assertTeamMemberAccessAllowed();
         Boolean isAdmin = isCurrentUserAdmin();
         Id contactId = getCurrentContactId();
 
@@ -291,10 +413,430 @@ public without sharing class LearningContentController {
     }
 
     @AuraEnabled
+    public static Boolean hasRequestedNextContentAccess(Id currentFolderId) {
+        Map<String, Object> status = getNextContentAccessRequestStatus(currentFolderId);
+        return (Boolean) status.get('alreadyRequested');
+    }
+
+    @AuraEnabled
+    public static Map<String, Object> getNextContentAccessRequestStatus(Id currentFolderId) {
+        Map<String, Object> status = new Map<String, Object>{
+            'available' => false,
+            'alreadyRequested' => false,
+            'requestStatus' => null,
+            'canNotifyAgain' => false
+        };
+        if (currentFolderId == null) {
+            return status;
+        }
+        if (isAutoCreateAssignmentEligibilityEnabled()) {
+            return status;
+        }
+
+        Id contactId = getCurrentContactId();
+        if (contactId == null) {
+            return status;
+        }
+
+        Learning_File__c nextLockedFile = getNextLockedFile(contactId, currentFolderId);
+        if (nextLockedFile == null) {
+            return status;
+        }
+
+        String subject = buildLearningAccessRequestSubject(nextLockedFile);
+        List<Case> existingRequests = [
+            SELECT Id, Status
+            FROM Case
+            WHERE ContactId = :contactId
+              AND Type = 'Other'
+              AND Subject = :subject
+            WITH SYSTEM_MODE
+            ORDER BY CreatedDate DESC
+            LIMIT 1
+        ];
+        Boolean alreadyRequested = !existingRequests.isEmpty();
+        String requestStatus = alreadyRequested ? existingRequests[0].Status : null;
+        status.put('available', true);
+        status.put('alreadyRequested', alreadyRequested);
+        status.put('requestStatus', requestStatus);
+        status.put('canNotifyAgain', requestStatus == 'New');
+        return status;
+    }
+
+    @AuraEnabled
+    public static Map<String, Object> requestNextContentAccess(Id currentFolderId) {
+        if (currentFolderId == null) {
+            throw new AuraHandledException('The current learning folder is required.');
+        }
+        if (isAutoCreateAssignmentEligibilityEnabled()) {
+            throw new AuraHandledException(
+                'Mentor access requests for learning files are unavailable while automatic assignment eligibility is enabled.'
+            );
+        }
+
+        Id contactId = getCurrentContactId();
+        if (contactId == null) {
+            throw new AuraHandledException('Your community user is not linked to a Contact.');
+        }
+
+        List<Contact> contacts = [
+            SELECT Id, Name, Mentor__c
+            FROM Contact
+            WHERE Id = :contactId
+            WITH SYSTEM_MODE
+            LIMIT 1
+        ];
+        if (contacts.isEmpty()) {
+            throw new AuraHandledException('Your learner Contact could not be found.');
+        }
+
+        Contact learner = contacts[0];
+        Id mentorId;
+        if (learner.Mentor__c != null) {
+            List<User> assignedMentors = [
+                SELECT Id, IsActive, ProfileId
+                FROM User
+                WHERE Id = :learner.Mentor__c AND IsActive = true
+                WITH SYSTEM_MODE
+                LIMIT 1
+            ];
+            if (!assignedMentors.isEmpty() && hasMentorOrAdminAccess(assignedMentors[0])) {
+                mentorId = assignedMentors[0].Id;
+            }
+        }
+
+        if (mentorId == null) {
+            throw new AuraHandledException(
+                'No active mentor with mentor or System Administrator access is assigned to your Contact. ' +
+                'Please contact your administrator.'
+            );
+        }
+        Id reviewQueueId = getLearningRequestQueueId();
+
+        Learning_File__c nextLockedFile = getNextLockedFile(contactId, currentFolderId);
+        if (nextLockedFile == null) {
+            throw new AuraHandledException('There are no additional locked files in this folder to request.');
+        }
+
+        String subject = buildLearningAccessRequestSubject(nextLockedFile);
+        List<Case> existingRequests = [
+            SELECT Id, OwnerId, Status
+            FROM Case
+            WHERE ContactId = :contactId
+              AND Type = 'Other'
+              AND Subject = :subject
+            WITH SYSTEM_MODE
+            ORDER BY CreatedDate DESC
+            LIMIT 1
+        ];
+        if (!existingRequests.isEmpty()) {
+            String message = 'You have already submitted an access request for "' + nextLockedFile.Name + '".';
+            if (existingRequests[0].Status == 'New') {
+                message = notifyMentorOfLearningAccessRequest(
+                    mentorId,
+                    existingRequests[0].Id,
+                    learner.Name,
+                    nextLockedFile.Name,
+                    true
+                );
+            }
+            return new Map<String, Object>{
+                'success' => true,
+                'caseId' => existingRequests[0].Id,
+                'alreadyRequested' => true,
+                'requestStatus' => existingRequests[0].Status,
+                'canNotifyAgain' => existingRequests[0].Status == 'New',
+                'message' => message
+            };
+        }
+
+        Case accessRequest = new Case(
+            ContactId = contactId,
+            OwnerId = reviewQueueId,
+            Subject = subject,
+            Type = 'Other',
+            Status = 'New',
+            Description = 'The learner is requesting access to the locked file "' +
+                nextLockedFile.Name + '". Learner: ' + learner.Name + '.'
+        );
+        Database.SaveResult saveResult = Database.insert(
+            accessRequest,
+            false,
+            AccessLevel.SYSTEM_MODE
+        );
+        if (!saveResult.isSuccess()) {
+            throw new AuraHandledException(
+                'Unable to submit the access request: ' +
+                saveResult.getErrors()[0].getMessage()
+            );
+        }
+
+        String message = notifyMentorOfLearningAccessRequest(
+            mentorId,
+            saveResult.getId(),
+            learner.Name,
+            nextLockedFile.Name,
+            false
+        );
+
+        return new Map<String, Object>{
+            'success' => true,
+            'caseId' => saveResult.getId(),
+            'alreadyRequested' => false,
+            'requestStatus' => 'New',
+            'canNotifyAgain' => true,
+            'message' => message
+        };
+    }
+
+    private static Boolean isAutoCreateAssignmentEligibilityEnabled() {
+        if (autoCreateAssignmentEligibilityOverride != null) {
+            return autoCreateAssignmentEligibilityOverride;
+        }
+        List<Assessment_Portal_Config__mdt> settings = [
+            SELECT Auto_Create_Assignment_Eligibility__c
+            FROM Assessment_Portal_Config__mdt
+            WHERE DeveloperName = 'Default'
+            WITH SYSTEM_MODE
+            LIMIT 1
+        ];
+        if (settings.isEmpty()) {
+            throw new AuraHandledException('The default assessment portal configuration is missing.');
+        }
+        return settings[0].Auto_Create_Assignment_Eligibility__c == true;
+    }
+
+    private static Id getLearningRequestQueueId() {
+        if (learningRequestQueueId != null) {
+            return learningRequestQueueId;
+        }
+
+        List<Group> queues = [
+            SELECT Id
+            FROM Group
+            WHERE Type = 'Queue'
+              AND DeveloperName = :QUEUE_DEV_NAME
+            WITH SYSTEM_MODE
+            LIMIT 1
+        ];
+        if (queues.isEmpty()) {
+            throw new AuraHandledException(
+                'The Learning File Review Queue is not configured. Please contact your administrator.'
+            );
+        }
+
+        List<QueueSobject> caseQueueAssignments = [
+            SELECT Id
+            FROM QueueSobject
+            WHERE QueueId = :queues[0].Id
+              AND SobjectType = 'Case'
+            WITH SYSTEM_MODE
+            LIMIT 1
+        ];
+        if (caseQueueAssignments.isEmpty()) {
+            throw new AuraHandledException(
+                'The Learning File Review Queue is not configured to own Cases. ' +
+                'Please contact your administrator.'
+            );
+        }
+        learningRequestQueueId = queues[0].Id;
+        return learningRequestQueueId;
+    }
+
+    private static String notifyMentorOfLearningAccessRequest(
+        Id mentorId,
+        Id caseId,
+        String learnerName,
+        String fileName,
+        Boolean isReminder
+    ) {
+        List<String> sentChannels = new List<String>();
+        List<String> notificationErrors = new List<String>();
+        try {
+            List<CustomNotificationType> notificationTypes = [
+                SELECT Id
+                FROM CustomNotificationType
+                WHERE DeveloperName = :NOTIFICATION_TYPE_DEV_NAME
+                WITH SYSTEM_MODE
+                LIMIT 1
+            ];
+            if (!notificationTypes.isEmpty()) {
+                Messaging.CustomNotification notification = new Messaging.CustomNotification();
+                notification.setTitle(isReminder ? 'Learning Access Reminder' : 'Learning Access Requested');
+                notification.setBody(learnerName + ' requested access to "' + fileName + '".');
+                notification.setNotificationTypeId(notificationTypes[0].Id);
+                notification.setTargetId(caseId);
+                notification.send(new Set<String>{ String.valueOf(mentorId) });
+                sentChannels.add('Salesforce notification');
+            } else {
+                notificationErrors.add('Salesforce notification type is not configured.');
+            }
+        } catch (Exception e) {
+            ErrorLogger.log(e);
+            notificationErrors.add('Salesforce notification could not be sent: ' + e.getMessage());
+        }
+
+        try {
+            List<User> mentors = [
+                SELECT Email
+                FROM User
+                WHERE Id = :mentorId AND IsActive = true
+                WITH SYSTEM_MODE
+                LIMIT 1
+            ];
+            if (mentors.isEmpty() || String.isBlank(mentors[0].Email)) {
+                notificationErrors.add('The mentor does not have an active user email address.');
+            } else {
+                Messaging.SingleEmailMessage email = new Messaging.SingleEmailMessage();
+                email.setToAddresses(new List<String>{ mentors[0].Email });
+                email.setSubject((isReminder ? 'Reminder: ' : '') + 'Learning access requested by ' + learnerName);
+                email.setPlainTextBody(
+                    learnerName + ' is requesting access to "' + fileName + '".\n\n' +
+                    'Review the request in Salesforce: ' +
+                    URL.getOrgDomainUrl().toExternalForm() + '/' + caseId
+                );
+                email.setSaveAsActivity(false);
+                Messaging.SendEmailResult[] emailResults = Messaging.sendEmail(
+                    new List<Messaging.SingleEmailMessage>{ email },
+                    false
+                );
+                if (!emailResults.isEmpty() && emailResults[0].isSuccess()) {
+                    sentChannels.add('email');
+                } else {
+                    List<String> emailErrors = new List<String>();
+                    if (!emailResults.isEmpty()) {
+                        for (Messaging.SendEmailError emailError : emailResults[0].getErrors()) {
+                            emailErrors.add(emailError.getMessage());
+                        }
+                    }
+                    notificationErrors.add(
+                        'Mentor email could not be sent: ' +
+                        (emailErrors.isEmpty() ? 'Salesforce returned no delivery details.' : String.join(emailErrors, '; '))
+                    );
+                }
+            }
+        } catch (Exception e) {
+            ErrorLogger.log(e);
+            notificationErrors.add('Mentor email could not be sent: ' + e.getMessage());
+        }
+
+        String message = isReminder
+            ? 'The existing access request for "' + fileName + '" remains open.'
+            : 'Your access request for "' + fileName + '" was recorded.';
+        if (!sentChannels.isEmpty()) {
+            message += ' Mentor notified by ' + String.join(sentChannels, ' and ') + '.';
+        }
+        if (!notificationErrors.isEmpty()) {
+            String errors = String.join(notificationErrors, ' ');
+            ErrorLogger.log(errors);
+            message += ' ' + errors;
+        }
+        return message;
+    }
+
+    private static Learning_File__c getNextLockedFile(Id contactId, Id folderId) {
+        List<Learning_Folder__c> folders = [
+            SELECT Id, Name, Parent_Folder__c, Sort_Order__c
+            FROM Learning_Folder__c
+            WITH SYSTEM_MODE
+        ];
+        folders.sort(new FolderNaturalComparator());
+
+        Map<Id, List<Learning_Folder__c>> childrenByParent = new Map<Id, List<Learning_Folder__c>>();
+        List<Learning_Folder__c> rootFolders = new List<Learning_Folder__c>();
+        for (Learning_Folder__c folder : folders) {
+            if (folder.Parent_Folder__c == null) {
+                rootFolders.add(folder);
+            } else {
+                if (!childrenByParent.containsKey(folder.Parent_Folder__c)) {
+                    childrenByParent.put(folder.Parent_Folder__c, new List<Learning_Folder__c>());
+                }
+                childrenByParent.get(folder.Parent_Folder__c).add(folder);
+            }
+        }
+
+        List<Id> orderedFolderIds = new List<Id>();
+        appendOrderedFolderIds(rootFolders, childrenByParent, orderedFolderIds);
+        Integer currentFolderIndex = orderedFolderIds.indexOf(folderId);
+        if (currentFolderIndex < 0) {
+            return null;
+        }
+
+        Set<Id> candidateFolderIds = new Set<Id>();
+        for (Integer i = currentFolderIndex; i < orderedFolderIds.size(); i++) {
+            candidateFolderIds.add(orderedFolderIds[i]);
+        }
+
+        List<Learning_File__c> allFiles = [
+            SELECT Id, Name, Learning_Folder__c, Sort_Order__c
+            FROM Learning_File__c
+            WHERE Learning_Folder__c IN :candidateFolderIds
+            WITH SYSTEM_MODE
+        ];
+        if (allFiles.isEmpty()) {
+            return null;
+        }
+        allFiles.sort(new FileNaturalComparator());
+
+        Set<Id> allFileIds = new Map<Id, Learning_File__c>(allFiles).keySet();
+        Set<Id> grantedFileIds = new Set<Id>();
+        for (Learning_Access__c accessRecord : [
+            SELECT Learning_File__c
+            FROM Learning_Access__c
+            WHERE Contact__c = :contactId
+              AND Access_Status__c = 'Granted'
+              AND Learning_File__c IN :allFileIds
+            WITH SYSTEM_MODE
+        ]) {
+            grantedFileIds.add(accessRecord.Learning_File__c);
+        }
+
+        Map<Id, List<Learning_File__c>> filesByFolder = new Map<Id, List<Learning_File__c>>();
+        for (Learning_File__c file : allFiles) {
+            if (!filesByFolder.containsKey(file.Learning_Folder__c)) {
+                filesByFolder.put(file.Learning_Folder__c, new List<Learning_File__c>());
+            }
+            filesByFolder.get(file.Learning_Folder__c).add(file);
+        }
+
+        for (Integer i = currentFolderIndex; i < orderedFolderIds.size(); i++) {
+            List<Learning_File__c> folderFiles = filesByFolder.get(orderedFolderIds[i]);
+            if (folderFiles == null) {
+                continue;
+            }
+            for (Learning_File__c file : folderFiles) {
+                if (!grantedFileIds.contains(file.Id)) {
+                    return file;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static void appendOrderedFolderIds(
+        List<Learning_Folder__c> folders,
+        Map<Id, List<Learning_Folder__c>> childrenByParent,
+        List<Id> orderedFolderIds
+    ) {
+        for (Learning_Folder__c folder : folders) {
+            orderedFolderIds.add(folder.Id);
+            List<Learning_Folder__c> childFolders = childrenByParent.get(folder.Id);
+            if (childFolders != null) {
+                appendOrderedFolderIds(childFolders, childrenByParent, orderedFolderIds);
+            }
+        }
+    }
+
+    private static String buildLearningAccessRequestSubject(Learning_File__c file) {
+        return 'Learning access request: ' + file.Name + ' (' + file.Id + ')';
+    }
+
+    @AuraEnabled
     public static Map<String, Object> markFileComplete(String fileId) {
         Map<String, Object> result = new Map<String, Object>();
 
         try {
+            LearningAccessAdminController.assertTeamMemberAccessAllowed();
             Id contactId = getCurrentContactId();
             if (contactId == null) {
                 throw new AuraHandledException('Unable to determine current user contact');
@@ -400,24 +942,6 @@ public without sharing class LearningContentController {
                 }
             }
 
-            System.debug('================== FOLDER COMPLETION CHECK ==================');
-            System.debug('Contact Id : ' + contactId);
-            System.debug('Current File : ' + currentFile.Id);
-            System.debug('Current Folder : ' + currentFile.Learning_Folder__c);
-
-            for (Learning_File__c f : allFolderFiles) {
-                Learning_Access__c acc = folderAccessByFileId.get(f.Id);
-
-                System.debug(
-                    'File = ' + f.Name +
-                    ', Access Exists = ' + (acc != null) +
-                    ', Status = ' + (acc == null ? 'NULL' : acc.Completion_Status__c)
-                );
-            }
-
-            System.debug('All Files Completed = ' + allFilesCompletedInFolder);
-            System.debug('=============================================================');
-
             if (!allFilesCompletedInFolder && autoAssignNextFile) {
                 // ─── Folder isn't finished yet — grant access to the next file
                 // in sequence (natural sort order) so it appears unlocked. ───
@@ -458,36 +982,10 @@ public without sharing class LearningContentController {
                 // ─── Every file in this folder is Completed — unlock the next
                 // content folder anywhere in the tree. ───
 
-                System.debug('==============================');
-                System.debug('CURRENT FOLDER ID: ' + currentFile.Learning_Folder__c);
-                System.debug('CURRENT FILE: ' + currentFile.Id);
-                System.debug('ALL FILES COMPLETED: ' + allFilesCompletedInFolder);
-
-                System.debug('Looking for next content folder...');
-
                 Learning_File__c firstFileOfNextFolder =
                     findNextContentFolderFirstFile(currentFile.Learning_Folder__c);
 
-                System.debug('Next Folder First File = ' + firstFileOfNextFolder);
-
                 if (firstFileOfNextFolder != null) {
-                    System.debug('Next File Id = ' + firstFileOfNextFolder.Id);
-                    System.debug('Next File Name = ' + firstFileOfNextFolder.Name);
-                    System.debug('Next Folder Id = ' + firstFileOfNextFolder.Learning_Folder__c);
-                } else {
-                    System.debug('No next content folder found.');
-                }
-                
-                System.debug('NEXT FILE: ' + firstFileOfNextFolder);
-
-                if (firstFileOfNextFolder != null) {
-                    System.debug('NEXT FILE NAME: ' + firstFileOfNextFolder.Name);
-                    System.debug('NEXT FOLDER ID: ' + firstFileOfNextFolder.Learning_Folder__c);
-                }
-
-                if (firstFileOfNextFolder != null) {
-                    System.debug('Checking existing access for next folder...');
-
                     List<Learning_Access__c> existingNextFolderAccess = [
                         SELECT Id
                         FROM Learning_Access__c
@@ -495,13 +993,7 @@ public without sharing class LearningContentController {
                         LIMIT 1
                     ];
 
-                    System.debug('Existing Access Count = ' + existingNextFolderAccess.size());
-
-                    System.debug('EXISTING ACCESS COUNT: ' + existingNextFolderAccess.size());
-
                     if (existingNextFolderAccess.isEmpty()) {
-                        System.debug('Creating Learning Access for next folder...');
-
                         Learning_Access__c nextFolderAccess = new Learning_Access__c(
                             Contact__c = contactId,
                             Learning_File__c = firstFileOfNextFolder.Id,
@@ -512,13 +1004,15 @@ public without sharing class LearningContentController {
                         );
                         applyLearningAccessName(nextFolderAccess, firstFileOfNextFolder);
                         Database.SaveResult insertResult = Database.insert(nextFolderAccess, false, AccessLevel.SYSTEM_MODE);
-                        
-                        System.debug('Insert Success = ' + insertResult.isSuccess());
-
                         if (!insertResult.isSuccess()) {
+                            List<String> errorMessages = new List<String>();
                             for (Database.Error err : insertResult.getErrors()) {
-                                System.debug('Insert Error = ' + err.getMessage());
+                                errorMessages.add(err.getMessage());
                             }
+                            ErrorLogger.log(
+                                'Unable to grant access to the next learning folder: ' +
+                                String.join(errorMessages, '; ')
+                            );
                         }
 
                         if (!insertResult.isSuccess()) {
@@ -570,7 +1064,7 @@ public without sharing class LearningContentController {
 
                 List<Id> preOrderFolderIds = new List<Id>();
                 for (Id rootId : rootFolderIds) {
-                    addFolderPreOrder(rootId, childIdsByParent, preOrderFolderIds);
+                    appendFolderAndDescendantsInPreOrder(rootId, childIdsByParent, preOrderFolderIds);
                 }
 
                 // Files and first-file mapping
@@ -767,6 +1261,7 @@ public without sharing class LearningContentController {
 
     @AuraEnabled(cacheable=true)
     public static List<RecentFileWrapper> getRecentFiles(Integer limitCount) {
+        LearningAccessAdminController.assertTeamMemberAccessAllowed();
         Integer effectiveLimit = (limitCount == null || limitCount <= 0) ? 5 : limitCount;
 
         Id contactId = getCurrentContactId();
@@ -802,9 +1297,6 @@ public without sharing class LearningContentController {
     }
 
     private static Learning_File__c findNextContentFolderFirstFile(Id currentFolderId) {
-        System.debug('================ NEXT FOLDER SEARCH ================');
-        System.debug('Current Folder Id = ' + currentFolderId);
-
         List<Learning_Folder__c> allFoldersList = [
             SELECT Id, Parent_Folder__c, Name
             FROM Learning_Folder__c
@@ -829,13 +1321,7 @@ public without sharing class LearningContentController {
         // Flatten the whole tree into pre-order (folder, then its children, then next sibling)
         List<Id> preOrderFolderIds = new List<Id>();
         for (Id rootId : rootFolderIds) {
-            addFolderPreOrder(rootId, childIdsByParent, preOrderFolderIds);
-        }
-
-        System.debug('PreOrder Folder Count = ' + preOrderFolderIds.size());
-
-        for (Id id : preOrderFolderIds) {
-            System.debug('Folder = ' + id);
+            appendFolderAndDescendantsInPreOrder(rootId, childIdsByParent, preOrderFolderIds);
         }
 
         // First file (by Sort_Order__c, then natural name order) for every folder that has files
@@ -862,12 +1348,6 @@ public without sharing class LearningContentController {
             }
         }
 
-        System.debug('Content Folder Order Count = ' + contentFolderOrder.size());
-
-        for (Id id : contentFolderOrder) {
-            System.debug('Content Folder = ' + id);
-        }
-
         Integer currentIdx = -1;
         for (Integer i = 0; i < contentFolderOrder.size(); i++) {
             if (contentFolderOrder[i] == currentFolderId) {
@@ -880,48 +1360,45 @@ public without sharing class LearningContentController {
             return null;
         }
 
-        System.debug('Current Index = ' + currentIdx);
-
         Id nextFolderId = contentFolderOrder[currentIdx + 1];
 
-        System.debug('Next Folder Id = ' + nextFolderId);
-
         Learning_File__c nextFile = firstFileByFolder.get(nextFolderId);
-
-        System.debug('Next File = ' + nextFile);
-
-        System.debug('====================================================');
 
         return nextFile;
     }
 
     @AuraEnabled
     public static Map<String, Object> debugNextContentFolder(Id currentFolderId) {
-        Map<String, Object> result = new Map<String, Object>();
+        return getNextContentFolderDiagnostics(currentFolderId);
+    }
+
+    @AuraEnabled
+    public static Map<String, Object> getNextContentFolderDiagnostics(Id currentFolderId) {
+        Map<String, Object> diagnostics = new Map<String, Object>();
 
         // Build pre-order folder list
-        List<Learning_Folder__c> allFoldersList = [
-            SELECT Id, Parent_Folder__c
+        List<Learning_Folder__c> orderedFolders = [
+            SELECT Id, Name, Parent_Folder__c
             FROM Learning_Folder__c
             ORDER BY Sort_Order__c NULLS LAST, Name
         ];
 
-        Map<Id, List<Id>> childIdsByParent = new Map<Id, List<Id>>();
+        Map<Id, List<Id>> childFolderIdsByParentId = new Map<Id, List<Id>>();
         List<Id> rootFolderIds = new List<Id>();
-        for (Learning_Folder__c f : allFoldersList) {
-            if (f.Parent_Folder__c == null) {
-                rootFolderIds.add(f.Id);
+        for (Learning_Folder__c folder : orderedFolders) {
+            if (folder.Parent_Folder__c == null) {
+                rootFolderIds.add(folder.Id);
             } else {
-                if (!childIdsByParent.containsKey(f.Parent_Folder__c)) {
-                    childIdsByParent.put(f.Parent_Folder__c, new List<Id>());
+                if (!childFolderIdsByParentId.containsKey(folder.Parent_Folder__c)) {
+                    childFolderIdsByParentId.put(folder.Parent_Folder__c, new List<Id>());
                 }
-                childIdsByParent.get(f.Parent_Folder__c).add(f.Id);
+                childFolderIdsByParentId.get(folder.Parent_Folder__c).add(folder.Id);
             }
         }
 
-        List<Id> preOrderFolderIds = new List<Id>();
+        List<Id> folderIdsInPreOrder = new List<Id>();
         for (Id rootId : rootFolderIds) {
-            addFolderPreOrder(rootId, childIdsByParent, preOrderFolderIds);
+            appendFolderAndDescendantsInPreOrder(rootId, childFolderIdsByParentId, folderIdsInPreOrder);
         }
 
         // First file per folder
@@ -932,80 +1409,87 @@ public without sharing class LearningContentController {
         ];
         allFiles.sort(new FileNaturalComparator());
 
-        Map<Id, Learning_File__c> firstFileByFolder = new Map<Id, Learning_File__c>();
+        Map<Id, Learning_File__c> firstFileByFolderId = new Map<Id, Learning_File__c>();
         for (Learning_File__c file : allFiles) {
-            if (!firstFileByFolder.containsKey(file.Learning_Folder__c)) {
-                firstFileByFolder.put(file.Learning_Folder__c, file);
+            if (!firstFileByFolderId.containsKey(file.Learning_Folder__c)) {
+                firstFileByFolderId.put(file.Learning_Folder__c, file);
             }
         }
 
-        List<Id> contentFolderOrder = new List<Id>();
-        for (Id fid : preOrderFolderIds) {
-            if (firstFileByFolder.containsKey(fid)) {
-                contentFolderOrder.add(fid);
+        List<Id> folderIdsWithContentInOrder = new List<Id>();
+        for (Id folderId : folderIdsInPreOrder) {
+            if (firstFileByFolderId.containsKey(folderId)) {
+                folderIdsWithContentInOrder.add(folderId);
             }
         }
 
         // Build human-readable maps for the client to consume
-        Map<String, String> folderNames = new Map<String, String>();
-        for (Learning_Folder__c f : allFoldersList) {
-            folderNames.put(String.valueOf(f.Id), f.Name);
+        Map<String, String> folderNameById = new Map<String, String>();
+        for (Learning_Folder__c folder : orderedFolders) {
+            folderNameById.put(String.valueOf(folder.Id), folder.Name);
         }
 
         // Count files per folder and capture first-file names
-        Map<String, Integer> fileCounts = new Map<String, Integer>();
-        Map<String, String> firstFileNames = new Map<String, String>();
+        Map<String, Integer> fileCountByFolderId = new Map<String, Integer>();
+        Map<String, String> firstFileNameByFolderId = new Map<String, String>();
         for (Learning_File__c file : allFiles) {
-            String fk = String.valueOf(file.Learning_Folder__c);
-            fileCounts.put(fk, fileCounts.containsKey(fk) ? fileCounts.get(fk) + 1 : 1);
-            if (!firstFileNames.containsKey(fk)) {
-                firstFileNames.put(fk, file.Name);
+            String folderId = String.valueOf(file.Learning_Folder__c);
+            fileCountByFolderId.put(
+                folderId,
+                fileCountByFolderId.containsKey(folderId) ? fileCountByFolderId.get(folderId) + 1 : 1
+            );
+            if (!firstFileNameByFolderId.containsKey(folderId)) {
+                firstFileNameByFolderId.put(folderId, file.Name);
             }
         }
 
-        result.put('preOrderFolderIds', preOrderFolderIds);
-        result.put('contentFolderOrder', contentFolderOrder);
-        result.put('folderNames', folderNames);
-        result.put('fileCounts', fileCounts);
-        result.put('firstFileNames', firstFileNames);
+        diagnostics.put('preOrderFolderIds', folderIdsInPreOrder);
+        diagnostics.put('contentFolderOrder', folderIdsWithContentInOrder);
+        diagnostics.put('folderNames', folderNameById);
+        diagnostics.put('fileCounts', fileCountByFolderId);
+        diagnostics.put('firstFileNames', firstFileNameByFolderId);
 
-        Integer currentIdx = -1;
-        for (Integer i = 0; i < contentFolderOrder.size(); i++) {
-            if (contentFolderOrder[i] == currentFolderId) {
-                currentIdx = i;
+        Integer currentFolderIndex = -1;
+        for (Integer folderIndex = 0; folderIndex < folderIdsWithContentInOrder.size(); folderIndex++) {
+            if (folderIdsWithContentInOrder[folderIndex] == currentFolderId) {
+                currentFolderIndex = folderIndex;
                 break;
             }
         }
 
-        result.put('currentIndex', currentIdx);
-        result.put('currentFolderId', currentFolderId);
+        diagnostics.put('currentIndex', currentFolderIndex);
+        diagnostics.put('currentFolderId', currentFolderId);
 
-        if (currentIdx == -1 || currentIdx + 1 >= contentFolderOrder.size()) {
-            result.put('nextFolderId', null);
-            result.put('nextFileId', null);
-            result.put('nextFileName', null);
-            return result;
+        if (currentFolderIndex == -1 || currentFolderIndex + 1 >= folderIdsWithContentInOrder.size()) {
+            diagnostics.put('nextFolderId', null);
+            diagnostics.put('nextFileId', null);
+            diagnostics.put('nextFileName', null);
+            return diagnostics;
         }
 
-        Id nextFolderId = contentFolderOrder[currentIdx + 1];
-        Learning_File__c nextFile = firstFileByFolder.get(nextFolderId);
-        result.put('nextFolderId', String.valueOf(nextFolderId));
+        Id nextFolderId = folderIdsWithContentInOrder[currentFolderIndex + 1];
+        Learning_File__c nextFile = firstFileByFolderId.get(nextFolderId);
+        diagnostics.put('nextFolderId', String.valueOf(nextFolderId));
         if (nextFile != null) {
-            result.put('nextFileId', String.valueOf(nextFile.Id));
-            result.put('nextFileName', nextFile.Name);
+            diagnostics.put('nextFileId', String.valueOf(nextFile.Id));
+            diagnostics.put('nextFileName', nextFile.Name);
         } else {
-            result.put('nextFileId', null);
-            result.put('nextFileName', null);
+            diagnostics.put('nextFileId', null);
+            diagnostics.put('nextFileName', null);
         }
 
-        return result;
+        return diagnostics;
     }
 
-    private static void addFolderPreOrder(Id folderId, Map<Id, List<Id>> childIdsByParent, List<Id> output) {
-        output.add(folderId);
-        if (childIdsByParent.containsKey(folderId)) {
-            for (Id childId : childIdsByParent.get(folderId)) {
-                addFolderPreOrder(childId, childIdsByParent, output);
+    private static void appendFolderAndDescendantsInPreOrder(
+        Id folderId,
+        Map<Id, List<Id>> childFolderIdsByParentId,
+        List<Id> orderedFolderIds
+    ) {
+        orderedFolderIds.add(folderId);
+        if (childFolderIdsByParentId.containsKey(folderId)) {
+            for (Id childFolderId : childFolderIdsByParentId.get(folderId)) {
+                appendFolderAndDescendantsInPreOrder(childFolderId, childFolderIdsByParentId, orderedFolderIds);
             }
         }
     }
@@ -1019,6 +1503,7 @@ public without sharing class LearningContentController {
         Map<String, Object> result = new Map<String, Object>();
 
         try {
+            LearningAccessAdminController.assertTeamMemberAccessAllowed();
             if (String.isBlank(fileId)) {
                 throw new AuraHandledException('File Id is required');
             }
@@ -1060,11 +1545,6 @@ public without sharing class LearningContentController {
                     Completion_Status__c = 'Not Started',
                     Granted_Date__c = System.now()
                 );
-                applyLearningAccessName(access, fileRecord);
-                Database.SaveResult insertResult = Database.insert(access, false, AccessLevel.SYSTEM_MODE);
-                if (!insertResult.isSuccess()) {
-                    throw new AuraHandledException('Unable to create Learning Access: ' + insertResult.getErrors()[0].getMessage());
-                }
             }
 
             applyLearningAccessName(access, fileRecord);
@@ -1072,6 +1552,11 @@ public without sharing class LearningContentController {
                 Database.SaveResult updateResult = Database.update(access, false, AccessLevel.SYSTEM_MODE);
                 if (!updateResult.isSuccess()) {
                     throw new AuraHandledException('Unable to update Learning Access: ' + updateResult.getErrors()[0].getMessage());
+                }
+            } else {
+                Database.SaveResult insertResult = Database.insert(access, false, AccessLevel.SYSTEM_MODE);
+                if (!insertResult.isSuccess()) {
+                    throw new AuraHandledException('Unable to create Learning Access: ' + insertResult.getErrors()[0].getMessage());
                 }
             }
 
@@ -1102,6 +1587,7 @@ public without sharing class LearningContentController {
         Map<String, Object> result = new Map<String, Object>();
 
         try {
+            LearningAccessAdminController.assertTeamMemberAccessAllowed();
             if (String.isBlank(fileId)) {
                 throw new AuraHandledException('File Id is required');
             }
@@ -1212,7 +1698,6 @@ public without sharing class LearningContentController {
         notification.send(recipientIds);
 
     } catch (Exception e) {
-        System.debug(LoggingLevel.ERROR, 'Notification send failed: ' + e.getMessage());
         ErrorLogger.log(e);
     }
 }

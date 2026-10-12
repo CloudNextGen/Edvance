@@ -1,6 +1,7 @@
 import { LightningElement, track } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import createContactAndUser from '@salesforce/apex/CreateCommunityUserFromFlow.createContactAndUser';
+import getDefaultLookupUsers from '@salesforce/apex/CreateCommunityUserFromFlow.getDefaultLookupUsers';
 
 export default class CreatingCommunityUser extends LightningElement {
     @track firstName         = '';
@@ -16,10 +17,39 @@ export default class CreatingCommunityUser extends LightningElement {
     @track isLoading         = false;
     @track isSuccess         = false;
 
+    defaultHrId = null;
+    defaultManagerId = null;
+    defaultMentorId = null;
+
     userTypeOptions = [
+        { label: 'HR',          value: 'HR'           },
         { label: 'Mentor',      value: 'Mentor'      },
         { label: 'Team Member', value: 'Team Member'  }
     ];
+
+    connectedCallback() {
+        getDefaultLookupUsers()
+            .then(defaults => {
+                this.defaultHrId = defaults.hrId || null;
+                this.defaultManagerId = defaults.managerId || null;
+                this.defaultMentorId = defaults.mentorId || null;
+                this.selectedHrId = this.defaultHrId;
+                this.selectedManagerId = this.defaultManagerId;
+                this.selectedMentorId = this.defaultMentorId;
+
+                if (defaults.warningMessage) {
+                    this.showToast('Lookup Defaults', defaults.warningMessage, 'warning');
+                }
+            })
+            .catch(error => {
+                const errorMsg = error.body ? error.body.message : error.message;
+                this.showToast(
+                    'Lookup Defaults',
+                    'Unable to load default lookup users: ' + errorMsg,
+                    'error'
+                );
+            });
+    }
 
     handleChange(event) {
         const field = event.target.dataset.field;
@@ -53,11 +83,6 @@ export default class CreatingCommunityUser extends LightningElement {
             return;
         }
 
-        if (this.userType === 'HR') {
-            this.showToast('Validation Error', 'HR User Type cannot be created from this form.', 'error');
-            return;
-        }
-
         this.isLoading = true;
         this.message   = '';
 
@@ -81,14 +106,15 @@ export default class CreatingCommunityUser extends LightningElement {
                 );
                 
                 this.isSuccess = true;
+                const createdUser = {
+                    firstName: this.firstName,
+                    lastName: this.lastName,
+                    email: this.email
+                };
                 this.resetForm();
 
                 this.dispatchEvent(new CustomEvent('usercreated', {
-                    detail: {
-                        firstName: this.firstName,
-                        lastName: this.lastName,
-                        email: this.email
-                    }
+                    detail: createdUser
                 }));
             } else {
                 this.showToast('Creation Failed', result, 'error');
@@ -123,15 +149,23 @@ export default class CreatingCommunityUser extends LightningElement {
         this.email             = '';
         this.phone             = '';
         this.selectedAccountId = null;
-        this.selectedHrId      = null;
-        this.selectedManagerId = null;
-        this.selectedMentorId  = null;
+        this.selectedHrId      = this.defaultHrId;
+        this.selectedManagerId = this.defaultManagerId;
+        this.selectedMentorId  = this.defaultMentorId;
         this.userType          = '';
         this.message           = '';
 
         const pickers = this.template.querySelectorAll('lightning-record-picker');
         pickers.forEach(picker => {
-            picker.value = null;
+            if (picker.dataset.field === 'hrPicker') {
+                picker.value = this.defaultHrId;
+            } else if (picker.dataset.field === 'managerPicker') {
+                picker.value = this.defaultManagerId;
+            } else if (picker.dataset.field === 'mentorPicker') {
+                picker.value = this.defaultMentorId;
+            } else {
+                picker.value = null;
+            }
         });
     }
 

@@ -1,7 +1,9 @@
 import { LightningElement, wire, track } from 'lwc';
 import { refreshApex } from '@salesforce/apex';
+import { CurrentPageReference } from 'lightning/navigation';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import getQueueRequests from '@salesforce/apex/PortalRequestService.getQueueRequests';
+import getRequestForReview from '@salesforce/apex/PortalRequestService.getRequestForReview';
 import saveRequestAndComment from '@salesforce/apex/PortalRequestService.saveRequestAndComment';
 
 const STATUS_LABEL = {
@@ -43,6 +45,8 @@ export default class AdminRequests extends LightningElement {
     originalStatus = '';
     @track statusOptions = STATUS_OPTIONS;
     @track selectedFilter = 'ALL';
+    requestedCaseId;
+    _autoOpenAttemptedCaseId;
 
     @wire(getQueueRequests)
     wiredRequests(result) {
@@ -51,6 +55,44 @@ export default class AdminRequests extends LightningElement {
             this.errorMessage = result.error?.body?.message ?? 'Could not load requests.';
         } else if (result.data) {
             this.errorMessage = '';
+            this.tryOpenRequestedCase();
+        }
+    }
+
+    @wire(CurrentPageReference)
+    wiredPageReference(pageReference) {
+        this.requestedCaseId = pageReference?.state?.c__caseId;
+        this.tryOpenRequestedCase();
+    }
+
+    async tryOpenRequestedCase() {
+        const caseId = this.requestedCaseId;
+        if (!caseId || !this.wiredResult?.data || caseId === this._autoOpenAttemptedCaseId) {
+            return;
+        }
+
+        this._autoOpenAttemptedCaseId = caseId;
+        const request = this.allRequestsList.find((item) => item.id === caseId);
+        if (request) {
+            this.openRequest(request);
+            return;
+        }
+
+        try {
+            const portalRequest = await getRequestForReview({ caseId });
+            this.openRequest({
+                id: portalRequest.Id,
+                subject: portalRequest.Subject || 'No Subject',
+                status: portalRequest.Status,
+                description: portalRequest.Description || 'No description provided.',
+                requesterName: portalRequest.Contact?.Name || 'Unknown Requester'
+            });
+        } catch (error) {
+            this.dispatchEvent(new ShowToastEvent({
+                title: 'Request unavailable',
+                message: error?.body?.message || 'Could not load this request.',
+                variant: 'error'
+            }));
         }
     }
 
@@ -68,18 +110,18 @@ export default class AdminRequests extends LightningElement {
     // Full, un-sliced dataset mapped into view models
     get allRequestsList() {
         if (!this.wiredResult?.data) return [];
-        return this.wiredResult.data.map((c) => {
+        return this.wiredResult.data.map((portalRequest) => {
             return {
-                id: c.Id,
-                subject: c.Subject || 'No Subject',
-                status: c.Status,
-                statusLabel: STATUS_LABEL[c.Status] || c.Status,
-                description: c.Description || 'No description provided.',
-                requesterName: c.Contact?.Name || 'Unknown Requester',
-                rowClass: STATUS_ROW_CLASS[c.Status] || 'request-row',
-                badgeClass: STATUS_BADGE_CLASS[c.Status] || 'badge badge_muted',
-                date: c.CreatedDate
-                    ? new Date(c.CreatedDate).toLocaleDateString([], {
+                id: portalRequest.Id,
+                subject: portalRequest.Subject || 'No Subject',
+                status: portalRequest.Status,
+                statusLabel: STATUS_LABEL[portalRequest.Status] || portalRequest.Status,
+                description: portalRequest.Description || 'No description provided.',
+                requesterName: portalRequest.Contact?.Name || 'Unknown Requester',
+                rowClass: STATUS_ROW_CLASS[portalRequest.Status] || 'request-row',
+                badgeClass: STATUS_BADGE_CLASS[portalRequest.Status] || 'badge badge_muted',
+                date: portalRequest.CreatedDate
+                    ? new Date(portalRequest.CreatedDate).toLocaleDateString([], {
                           day: '2-digit',
                           month: 'short',
                           year: 'numeric'
@@ -94,7 +136,7 @@ export default class AdminRequests extends LightningElement {
         if (this.selectedFilter === 'ALL') {
             return this.allRequestsList;
         }
-        return this.allRequestsList.filter((r) => r.status === this.selectedFilter);
+        return this.allRequestsList.filter((portalRequest) => portalRequest.status === this.selectedFilter);
     }
 
     get totalCount() {
@@ -102,15 +144,15 @@ export default class AdminRequests extends LightningElement {
     }
 
     get openCount() {
-        return this.allRequestsList.filter((r) => r.status === 'New').length;
+        return this.allRequestsList.filter((portalRequest) => portalRequest.status === 'New').length;
     }
 
     get progressCount() {
-        return this.allRequestsList.filter((r) => r.status === 'Working').length;
+        return this.allRequestsList.filter((portalRequest) => portalRequest.status === 'Working').length;
     }
 
     get completedCount() {
-        return this.allRequestsList.filter((r) => r.status === 'Closed').length;
+        return this.allRequestsList.filter((portalRequest) => portalRequest.status === 'Closed').length;
     }
 
     // Active button styling getters
@@ -160,26 +202,30 @@ export default class AdminRequests extends LightningElement {
 
     handleRowClick(event) {
         const id = event.currentTarget.dataset.id;
-        const request = this.allRequestsList.find((r) => r.id === id);
+        const request = this.allRequestsList.find((portalRequest) => portalRequest.id === id);
         if (request) {
-            this.selectedCaseId = id;
-            this.selectedRequester = request.requesterName;
-            this.selectedSubject = request.subject;
-            this.selectedDescription = request.description;
-            this.selectedStatus = request.status;
-            this.originalStatus = request.status;
-            this.formError = '';
-            this.isModalOpen = true;
-
-            // Bust cache and sync comments fresh from server
-            // eslint-disable-next-line @lwc/lwc/no-async-operation
-            setTimeout(() => {
-                const thread = this.template.querySelector('c-case-comment-thread');
-                if (thread) {
-                    thread.refresh();
-                }
-            }, 0);
+            this.openRequest(request);
         }
+    }
+
+    openRequest(request) {
+        this.selectedCaseId = request.id;
+        this.selectedRequester = request.requesterName;
+        this.selectedSubject = request.subject;
+        this.selectedDescription = request.description;
+        this.selectedStatus = request.status;
+        this.originalStatus = request.status;
+        this.formError = '';
+        this.isModalOpen = true;
+
+        // Bust cache and sync comments fresh from server
+        // eslint-disable-next-line @lwc/lwc/no-async-operation
+        setTimeout(() => {
+            const thread = this.template.querySelector('c-case-comment-thread');
+            if (thread) {
+                thread.refresh();
+            }
+        }, 0);
     }
 
     handleCloseModal() {

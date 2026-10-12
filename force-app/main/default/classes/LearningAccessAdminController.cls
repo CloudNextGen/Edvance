@@ -1,7 +1,21 @@
 public with sharing class LearningAccessAdminController {
+    private static final String PERM_MENTOR = 'Portal_Mentor_Access';
     @TestVisible private static Boolean canManageFilesOverride;
+    @TestVisible private static Boolean mentorAssignmentAllowedOverride;
+    @TestVisible private static Boolean mentorCheckedInTodayOverride;
+    @TestVisible private static Datetime mentorAssignmentNowOverride;
+    @TestVisible private static Id mentorCurrentContactIdOverride;
+    @TestVisible private static Boolean systemAdministratorOverride;
+    @TestVisible private static Boolean teamMemberAccessEnforcementOverride;
+    @TestVisible private static Boolean teamMemberPermissionOverride;
+    @TestVisible private static Boolean mentorPermissionOverride;
+    @TestVisible private static Boolean teamMemberCheckedInTodayOverride;
+    @TestVisible private static Boolean teamMemberWithinBusinessHoursOverride;
 
     private static void assertCanManageFiles() {
+        if (isSystemAdministrator()) {
+            return;
+        }
         Boolean canManageFiles = canManageFilesOverride != null
             ? canManageFilesOverride
             : FeatureManagement.checkPermission('Assign_Files');
@@ -264,6 +278,146 @@ public with sharing class LearningAccessAdminController {
         }
         
         return String.isNotBlank(digits) ? Integer.valueOf(digits) : 9999;
+    }
+
+    @AuraEnabled
+    public static Boolean canMentorAssignFilesNow() {
+        if (isSystemAdministrator()) {
+            return true;
+        }
+        if (mentorAssignmentAllowedOverride != null) {
+            return mentorAssignmentAllowedOverride;
+        }
+        if (!FeatureManagement.checkPermission(PERM_MENTOR)) {
+            return true;
+        }
+
+        Id currentContactId = mentorCurrentContactIdOverride != null
+            ? mentorCurrentContactIdOverride
+            : getCurrentContactId();
+        Boolean checkedInToday = mentorCheckedInTodayOverride != null
+            ? mentorCheckedInTodayOverride
+            : hasMentorCheckedInToday(currentContactId);
+        Datetime assignmentNow = mentorAssignmentNowOverride != null
+            ? mentorAssignmentNowOverride
+            : Datetime.now();
+        return checkedInToday && isBusinessHoursOpen(assignmentNow);
+    }
+
+    private static Boolean hasMentorCheckedInToday(Id contactId) {
+        if (contactId == null) {
+            return false;
+        }
+
+        Date today = Date.today();
+        List<Attendance_Log__c> logs = [
+            SELECT Id, Type__c
+            FROM Attendance_Log__c
+            WHERE Employee__c = :contactId
+              AND Is_Valid__c = true
+              AND Type__c IN ('Office Check-In', 'Office Check-Out')
+              AND Attendance_Summary__r.Date__c = :today
+              WITH SYSTEM_MODE
+        ];
+
+        Boolean checkedIn = false;
+        Boolean checkedOut = false;
+        for (Attendance_Log__c log : logs) {
+            if (log.Type__c == 'Office Check-In') {
+                checkedIn = true;
+            } else if (log.Type__c == 'Office Check-Out') {
+                checkedOut = true;
+            }
+        }
+
+        return checkedIn && !checkedOut;
+    }
+
+    private static Boolean isBusinessHoursOpen(Datetime targetTime) {
+        List<BusinessHours> defaultHours = [
+            SELECT Id
+            FROM BusinessHours
+            WHERE IsDefault = true
+            LIMIT 1
+        ];
+        return !defaultHours.isEmpty() && BusinessHours.isWithin(defaultHours[0].Id, targetTime);
+    }
+
+    private static Id getCurrentContactId() {
+        User u = [SELECT ContactId FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1];
+        return u.ContactId;
+    }
+
+    public static Boolean isSystemAdministrator() {
+        if (systemAdministratorOverride != null) {
+            return systemAdministratorOverride;
+        }
+        return FeatureManagement.checkPermission('Assign_Files')
+            && FeatureManagement.checkPermission('View_Assignments')
+            && FeatureManagement.checkPermission('View_Attendance')
+            && FeatureManagement.checkPermission('Portal_HR_Access')
+            && FeatureManagement.checkPermission('Portal_Mentor_Access')
+            && FeatureManagement.checkPermission('Portal_Team_Member_Access');
+    }
+
+    @AuraEnabled(cacheable=true)
+    public static Boolean isCurrentUserSystemAdministrator() {
+        return isSystemAdministrator();
+    }
+
+    public static void assertTeamMemberAccessAllowed() {
+        if (isSystemAdministrator()) {
+            return;
+        }
+
+        Boolean isTeamMember = teamMemberPermissionOverride != null
+            ? teamMemberPermissionOverride
+            : FeatureManagement.checkPermission('Portal_Team_Member_Access');
+        Boolean isMentor = mentorPermissionOverride != null
+            ? mentorPermissionOverride
+            : FeatureManagement.checkPermission(PERM_MENTOR);
+        if (!isTeamMember || isMentor) {
+            return;
+        }
+
+        Boolean enforceAccessWindow = teamMemberAccessEnforcementOverride;
+        if (enforceAccessWindow == null) {
+            List<Assessment_Portal_Config__mdt> configs = [
+                SELECT Enforce_Team_Member_Access_Window__c
+                FROM Assessment_Portal_Config__mdt
+                WHERE DeveloperName = 'Default'
+                LIMIT 1
+            ];
+            if (configs.isEmpty()) {
+                throw new AuraHandledException('Team member access window is not configured.');
+            }
+            enforceAccessWindow = configs[0].Enforce_Team_Member_Access_Window__c;
+        }
+        if (!enforceAccessWindow) {
+            return;
+        }
+
+        Id contactId = mentorCurrentContactIdOverride != null
+            ? mentorCurrentContactIdOverride
+            : getCurrentContactId();
+        Boolean checkedInToday = teamMemberCheckedInTodayOverride != null
+            ? teamMemberCheckedInTodayOverride
+            : hasMentorCheckedInToday(contactId);
+        if (!checkedInToday) {
+            throw new AuraHandledException(
+                'Team members can access files and assignments only after a valid office check-in and before checking out.'
+            );
+        }
+
+        Datetime accessTime = mentorAssignmentNowOverride != null
+            ? mentorAssignmentNowOverride
+            : Datetime.now();
+        Boolean withinBusinessHours = teamMemberWithinBusinessHoursOverride != null
+            ? teamMemberWithinBusinessHoursOverride
+            : isBusinessHoursOpen(accessTime);
+        if (!withinBusinessHours) {
+            throw new AuraHandledException('Team member access to files and assignments is available only during Business Hours.');
+        }
     }
 
     @AuraEnabled

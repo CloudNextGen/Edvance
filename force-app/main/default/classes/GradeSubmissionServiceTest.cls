@@ -196,7 +196,10 @@ private class GradeSubmissionServiceTest {
             try {
                 GradeSubmissionService.gradeSubmission(new List<Id>{ sub.Id });
             } catch (System.DmlException e) {
-                System.debug('Captured Flow validation error safely inside test structure: ' + e.getMessage());
+                System.assert(
+                    String.isNotBlank(e.getMessage()),
+                    'The flow validation should return a diagnostic message.'
+                );
             }
         }
         Test.stopTest();

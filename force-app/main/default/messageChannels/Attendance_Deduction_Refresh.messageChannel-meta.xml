@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningMessageChannel xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Notifies attendance deduction views after an appeal decision.</description>
+    <isExposed>true</isExposed>
+    <lightningMessageFields>
+        <description>The action that requires deduction data to refresh.</description>
+        <fieldName>action</fieldName>
+    </lightningMessageFields>
+    <masterLabel>Attendance Deduction Refresh</masterLabel>
+</LightningMessageChannel>

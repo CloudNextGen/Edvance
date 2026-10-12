@@ -31,6 +31,7 @@ export default class MyRequests extends LightningElement {
     wiredResult;
     errorMessage = '';
     isRefreshing = false;
+    selectedFilter = 'ALL';
 
     // Row expand/collapse state
     expandedIds = new Set();
@@ -54,23 +55,68 @@ export default class MyRequests extends LightningElement {
         }
     }
 
-    get displayRequests() {
+    get allRequests() {
         if (!this.wiredResult?.data) return [];
-        return this.wiredResult.data.map((c) => {
-            const isExpanded = this.expandedIds.has(c.Id);
+        return this.wiredResult.data.map((portalRequest) => {
+            const isExpanded = this.expandedIds.has(portalRequest.Id);
             return {
-                id: c.Id,
-                subject: c.Subject,
-                status: c.Status,
-                statusLabel: STATUS_LABEL[c.Status] || c.Status,
-                description: c.Description,
-                rowClass: (STATUS_ROW_CLASS[c.Status] || 'request-row') + (isExpanded ? ' request-row_expanded' : ''),
-                badgeClass: STATUS_BADGE_CLASS[c.Status] || 'badge badge_muted',
+                id: portalRequest.Id,
+                subject: portalRequest.Subject,
+                status: portalRequest.Status,
+                statusLabel: STATUS_LABEL[portalRequest.Status] || portalRequest.Status,
+                description: portalRequest.Description,
+                rowClass: (STATUS_ROW_CLASS[portalRequest.Status] || 'request-row') +
+                    (isExpanded ? ' request-row_expanded' : ''),
+                badgeClass: STATUS_BADGE_CLASS[portalRequest.Status] || 'badge badge_muted',
                 chevronClass: 'chevron-icon' + (isExpanded ? ' chevron-icon_open' : ''),
                 isExpanded,
-                date: new Date(c.CreatedDate).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' })
+                date: new Date(portalRequest.CreatedDate).toLocaleDateString(
+                    [],
+                    { day: '2-digit', month: 'short', year: 'numeric' }
+                )
             };
         });
+    }
+
+    get displayRequests() {
+        if (this.selectedFilter === 'ALL') return this.allRequests;
+        return this.allRequests.filter((request) => request.status === this.selectedFilter);
+    }
+
+    get totalCount() {
+        return this.allRequests.length;
+    }
+
+    get openCount() {
+        return this.allRequests.filter((request) => request.status === 'New').length;
+    }
+
+    get progressCount() {
+        return this.allRequests.filter((request) => request.status === 'Working').length;
+    }
+
+    get completedCount() {
+        return this.allRequests.filter((request) => request.status === 'Closed').length;
+    }
+
+    get allFilterClass() {
+        return `filter-btn ${this.selectedFilter === 'ALL' ? 'filter-btn_active' : ''}`;
+    }
+
+    get openFilterClass() {
+        return `filter-btn stat-open ${this.selectedFilter === 'New' ? 'filter-btn_active stat-open_active' : ''}`;
+    }
+
+    get progressFilterClass() {
+        return `filter-btn stat-progress ${this.selectedFilter === 'Working' ? 'filter-btn_active stat-progress_active' : ''}`;
+    }
+
+    get completedFilterClass() {
+        return `filter-btn stat-completed ${this.selectedFilter === 'Closed' ? 'filter-btn_active stat-completed_active' : ''}`;
+    }
+
+    handleFilterChange(event) {
+        this.selectedFilter = event.currentTarget.dataset.filter;
     }
 
     get hasRequests() {
@@ -79,6 +125,12 @@ export default class MyRequests extends LightningElement {
 
     get noRequests() {
         return !!this.wiredResult?.data && this.displayRequests.length === 0;
+    }
+
+    get noRequestsMessage() {
+        return this.totalCount === 0
+            ? "You haven't raised any requests yet."
+            : 'No requests found for this filter.';
     }
 
     get hasError() {
@@ -103,11 +155,11 @@ export default class MyRequests extends LightningElement {
     }
 
     handleRowToggle(event) {
-        const id = event.currentTarget.dataset.id;
-        if (this.expandedIds.has(id)) {
-            this.expandedIds.delete(id);
+        const requestId = event.currentTarget.dataset.id;
+        if (this.expandedIds.has(requestId)) {
+            this.expandedIds.delete(requestId);
         } else {
-            this.expandedIds.add(id);
+            this.expandedIds.add(requestId);
         }
         this.expandedIds = new Set(this.expandedIds);
     }
@@ -160,7 +212,7 @@ export default class MyRequests extends LightningElement {
             await refreshApex(this.wiredResult);
 
             const threads = this.template.querySelectorAll('c-case-comment-thread');
-            await Promise.all(Array.from(threads).map((t) => t.refresh()));
+            await Promise.all(Array.from(threads).map((commentThread) => commentThread.refresh()));
         } finally {
             this.isRefreshing = false;
         }

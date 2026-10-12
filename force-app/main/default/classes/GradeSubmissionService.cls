@@ -109,32 +109,37 @@ public with sharing class GradeSubmissionService {
 
     // ─── Mark parent Submission as Graded once all child Responses are done ──
     private static void markSubmissionsGraded(List<Id> submissionIds) {
-        List<User_Submission__c> submissions = [
-            SELECT Id, Status__c,
-                   (SELECT Id, AI_Grade__c FROM Question_Response__r)
-            FROM   User_Submission__c
-            WHERE  Id IN :submissionIds
-            WITH   USER_MODE
-        ];
+        try {
+            List<User_Submission__c> submissions = [
+                SELECT Id, Status__c,
+                       (SELECT Id, AI_Grade__c FROM Question_Response__r)
+                FROM   User_Submission__c
+                WHERE  Id IN :submissionIds
+                WITH   USER_MODE
+            ];
 
-        List<User_Submission__c> toUpdate = new List<User_Submission__c>();
+            List<User_Submission__c> toUpdate = new List<User_Submission__c>();
 
-        for (User_Submission__c sub : submissions) {
-            Boolean allGraded = true;
-            for (Question_Response__c r : sub.Question_Response__r) {
-                if (r.AI_Grade__c == null) {
-                    allGraded = false;
-                    break;
+            for (User_Submission__c sub : submissions) {
+                Boolean allGraded = true;
+                for (Question_Response__c r : sub.Question_Response__r) {
+                    if (r.AI_Grade__c == null) {
+                        allGraded = false;
+                        break;
+                    }
+                }
+                if (allGraded && sub.Status__c != 'Graded') {
+                    sub.Status__c = 'Graded';
+                    toUpdate.add(sub);
                 }
             }
-            if (allGraded && sub.Status__c != 'Graded') {
-                sub.Status__c = 'Graded';
-                toUpdate.add(sub);
-            }
-        }
 
-        if (!toUpdate.isEmpty()) {
-            update toUpdate;
+            if (!toUpdate.isEmpty()) {
+                update toUpdate;
+            }
+        } catch (Exception e) {
+            ErrorLogger.log(e);
+            throw e;
         }
     }
 

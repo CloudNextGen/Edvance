@@ -14,7 +14,8 @@
       "type" : "component"
     }, {
       "componentAttributes" : {
-        "heroSubtitle" : "Everything you need to check in, learn, complete assignments, and track your onboarding — all in one place."
+        "heroSubtitle" : "Your onboarding journey starts here. Complete your tasks, access important resources, and stay updated every step of the way.",
+        "welcomeMessage" : "Welcome to CloudNextGen!"
       },
       "componentName" : "c:portalHome",
       "id" : "86656d04-e6b3-474a-8144-72a90f36d36f",

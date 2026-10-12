@@ -17,10 +17,6 @@
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>
-        <apexClass>Attendancegeoutils</apexClass>
-        <enabled>true</enabled>
-    </classAccesses>
-    <classAccesses>
         <apexClass>CreateCommunityUserFromFlow</apexClass>
         <enabled>true</enabled>
     </classAccesses>
@@ -34,6 +30,10 @@
     </classAccesses>
     <classAccesses>
         <apexClass>PortalHomeController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>PortalNotificationRouterController</apexClass>
         <enabled>true</enabled>
     </classAccesses>
     <classAccesses>

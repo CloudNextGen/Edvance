@@ -2,7 +2,9 @@ import { LightningElement, api } from 'lwc';
 import getAssignableAssignmentsTree from '@salesforce/apex/Assignmentadmincontroller.getAssignableAssignmentsTree';
 import assignAssignmentsToContact from '@salesforce/apex/Assignmentadmincontroller.assignAssignmentsToContact';
 import reassignAssignment from '@salesforce/apex/Assignmentadmincontroller.reassignAssignment';
+import revokeAssignmentFromContact from '@salesforce/apex/Assignmentadmincontroller.revokeAssignmentFromContact';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import LightningConfirm from 'lightning/confirm';
 
 export default class AssignAssignmentsModal extends LightningElement {
     @api contactId;
@@ -120,6 +122,28 @@ export default class AssignAssignmentsModal extends LightningElement {
             await this.loadTree();
         } catch (error) {
             this.showToast('Error reassigning', error.body?.message || error.message, 'error');
+        } finally {
+            this.isLoading = false;
+        }
+    }
+
+    async handleRevoke(event) {
+        const eligibilityId = event.currentTarget.dataset.eligibilityId;
+        const assignmentName = event.currentTarget.dataset.name;
+        const confirmed = await LightningConfirm.open({
+            label: 'Revoke assignment access',
+            message: `Revoke access to "${assignmentName}" for ${this.userName}?`,
+            theme: 'warning'
+        });
+        if (!confirmed) return;
+
+        this.isLoading = true;
+        try {
+            await revokeAssignmentFromContact({ contactId: this.contactId, eligibilityId });
+            this.showToast('Access revoked', `${assignmentName} is no longer available to ${this.userName}.`, 'success');
+            await this.loadTree();
+        } catch (error) {
+            this.showToast('Could not revoke assignment access', error.body?.message || error.message, 'error');
         } finally {
             this.isLoading = false;
         }

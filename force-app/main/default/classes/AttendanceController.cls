@@ -25,12 +25,16 @@
  *   Lunch_Duration_Minutes__c (Number)
  */
 public with sharing class AttendanceController {
+    private static final Integer HISTORY_PAGE_SIZE = 10;
 
     private static final Decimal MAX_ACCEPTABLE_ACCURACY_METERS = 100;
 
     private static final Decimal DEDUCTION_AMOUNT = 50;
     private static final Integer MONTHLY_LATE_GRACE_DAYS = 3;
     @TestVisible private static Boolean excludeSaturdayOverride;
+    @TestVisible private static Id currentContactIdOverride;
+    @TestVisible private static Datetime officeCheckInNowOverride;
+    @TestVisible private static BusinessHours defaultBusinessHoursOverride;
 
     // Lunch Check-In = lunch starts, Lunch Check-Out = lunch ends
     private static final List<String> PUNCH_SEQUENCE = new List<String>{
@@ -46,22 +50,26 @@ public with sharing class AttendanceController {
             Id contactId = getCurrentContactId();
             Date today = Date.today();
 
-            List<Attendance_Log__c> logs = [
-                SELECT Id, Type__c, Event_Timestamp__c, Status__c, Late_Minutes__c,
-                       Excusal_Reason__c, Deduction_Amount__c
-                FROM Attendance_Log__c
-                WHERE Employee__c = :contactId
-                  AND Is_Valid__c = true
-                  AND Attendance_Summary__r.Date__c = :today
-                ORDER BY Event_Timestamp__c ASC
-            ];
+            Attendance_Config__mdt office = getOfficeConfig();
+            rec.nextOfficeCheckInOpensAt = getNextOfficeCheckInOpensAt(today, office);
+            List<Attendance_Log__c> logs = getValidAttendanceLogs(contactId, today);
+            Boolean carryingOverPreviousShift = false;
+            if (!containsPunchType(logs, 'Office Check-In') &&
+                isBeforeOfficeCheckInOpens(today, office)) {
+                List<Attendance_Log__c> previousDayLogs = getValidAttendanceLogs(contactId, today.addDays(-1));
+                if (containsPunchType(previousDayLogs, 'Office Check-In') &&
+                    !containsPunchType(previousDayLogs, 'Office Check-Out')) {
+                    logs = previousDayLogs;
+                    carryingOverPreviousShift = true;
+                }
+            }
 
             Map<String, Attendance_Log__c> byType = new Map<String, Attendance_Log__c>();
             for (Attendance_Log__c l : logs) {
                 byType.put(l.Type__c, l);
             }
 
-            Attendance_Config__mdt office = getOfficeConfig();
+            rec.lunchDurationMinutes = office.Lunch_Duration_Minutes__c;
 
             for (String type : PUNCH_SEQUENCE) {
                 PunchEntryDTO entry = new PunchEntryDTO();
@@ -79,7 +87,13 @@ public with sharing class AttendanceController {
                     entry.completed = false;
                 }
                 entry.eligible = !entry.completed && isEligible(type, byType.keySet());
+                if (carryingOverPreviousShift) {
+                    entry.eligible = !entry.completed && type == 'Office Check-Out';
+                }
                 entry.needsPhoto = needsPhotoFor(type, office);
+                if (type == 'Office Check-In') {
+                    entry.officeCheckInOpensAt = getOfficeCheckInOpensAt(today, office);
+                }
                 rec.entries.add(entry);
             }
             rec.isDone = byType.keySet().size() == PUNCH_SEQUENCE.size();
@@ -109,13 +123,20 @@ public with sharing class AttendanceController {
             Contact contactRec = [SELECT Name FROM Contact WHERE Id = :contactId LIMIT 1];
             String contactName = contactRec != null ? contactRec.Name : 'Unknown';
             Date today = Date.today();
-            String todayLabel = formatDateLabel(today);
+            Date attendanceDate = today;
 
-            List<Attendance_Log__c> existingToday = [
-                SELECT Type__c FROM Attendance_Log__c
-                WHERE Employee__c = :contactId AND Is_Valid__c = true
-                  AND Attendance_Summary__r.Date__c = :today
-            ];
+            Attendance_Config__mdt office = getOfficeConfig();
+            List<Attendance_Log__c> existingToday = getValidAttendanceLogs(contactId, today);
+            if (punchType == 'Office Check-Out' &&
+                !containsPunchType(existingToday, 'Office Check-In') &&
+                isBeforeOfficeCheckInOpens(today, office)) {
+                List<Attendance_Log__c> previousDayLogs = getValidAttendanceLogs(contactId, today.addDays(-1));
+                if (containsPunchType(previousDayLogs, 'Office Check-In') &&
+                    !containsPunchType(previousDayLogs, 'Office Check-Out')) {
+                    existingToday = previousDayLogs;
+                    attendanceDate = today.addDays(-1);
+                }
+            }
             Set<String> doneTypes = new Set<String>();
             for (Attendance_Log__c l : existingToday) {
                 doneTypes.add(l.Type__c);
@@ -133,7 +154,12 @@ public with sharing class AttendanceController {
                 return result;
             }
 
-            Attendance_Config__mdt office = getOfficeConfig();
+            if (punchType == 'Office Check-In' && !isOfficeCheckInOpen(today, office)) {
+                Datetime opensAt = getOfficeCheckInOpensAt(today, office);
+                result.success = false;
+                result.message = 'Office Check-In opens at ' + opensAt.format('h:mm a') + '.';
+                return result;
+            }
 
             if (needsPhotoFor(punchType, office) && String.isBlank(photoBase64)) {
                 result.success = false;
@@ -141,7 +167,7 @@ public with sharing class AttendanceController {
                 return result;
             }
 
-            Double distance = AttendanceGeoUtils.distanceMeters(
+            Double distance = new AttendanceGeoUtils().distanceMeters(
                 latitude, longitude,
                 office.Latitude__c != null ? office.Latitude__c.doubleValue() : null,
                 office.Longitude__c != null ? office.Longitude__c.doubleValue() : null
@@ -150,12 +176,14 @@ public with sharing class AttendanceController {
             Boolean withinRadius = distance <= office.Allowed_Radius_Meters__c;
             Boolean isValid = punchType == 'Office Check-Out' ? true : accuracyOk && withinRadius;
 
-            Attendance_Summary__c summary = getOrCreateSummary(contactId, today, contactName, todayLabel);
+            Attendance_Summary__c summary = getOrCreateSummary(
+                contactId, attendanceDate, contactName, formatDateLabel(attendanceDate)
+            );
 
             Attendance_Log__c logRec = new Attendance_Log__c();
             logRec.Attendance_Summary__c = summary.Id;
             logRec.Employee__c = contactId;
-            logRec.Name = contactName + ' ' + todayLabel + ' ' + punchType;
+            logRec.Name = contactName + ' ' + formatDateLabel(attendanceDate) + ' ' + punchType;
             logRec.Type__c = punchType;
             logRec.Event_Timestamp__c = System.now();
             logRec.Latitude__c = latitude;
@@ -168,15 +196,15 @@ public with sharing class AttendanceController {
                 logRec.Rejection_Reason__c = !accuracyOk ? 'Your attendance is not captured due to the Poor GPS accuracy, Please try again.' : 'Your attendance is not captured as you are outside the allowed office radius.';
             }
 
-            // Lateness is evaluated on Office Check-In and Lunch Check-Out. Both share
-            // the monthly three-distinct-late-day grace; after grace, each late event
-            // gets its own deduction, even when both events are late on the same date.
+            // Office and lunch lateness each have their own monthly three-occurrence grace.
             if (isValid && (punchType == 'Office Check-In' || punchType == 'Lunch Check-Out')) {
-                Integer lateMinutes = calculateLateMinutes(punchType, office, summary, logRec.Event_Timestamp__c);
+                Integer lateMinutes = calculateLateMinutes(
+                    punchType, office, summary, logRec.Event_Timestamp__c, attendanceDate
+                );
                 logRec.Late_Minutes__c = lateMinutes;
                 if (lateMinutes > 0) {
                     logRec.Status__c = 'Not Excused';
-                    logRec.Deduction_Amount__c = isBeyondMonthlyLateGrace(contactId, today)
+                    logRec.Deduction_Amount__c = isBeyondMonthlyLateGrace(contactId, today, punchType)
                         ? DEDUCTION_AMOUNT
                         : 0;
                 } else {
@@ -212,24 +240,38 @@ public with sharing class AttendanceController {
         if (String.isBlank(reason)) {
             throw new AuraHandledException('Please enter a reason before submitting.');
         }
-        Id contactId = getCurrentContactId();
 
-        List<Attendance_Log__c> matches = [
-            SELECT Id, Type__c, Late_Minutes__c, Employee__r.Name
-            FROM Attendance_Log__c
-            WHERE Id = :logId AND Employee__c = :contactId AND Status__c = 'Not Excused' AND Late_Minutes__c > 0 AND Appeal_Submitted__c = false
-            LIMIT 1
-        ];
-        if (matches.isEmpty()) {
-            throw new AuraHandledException('This record is not available for appeal.');
+        try {
+            Id contactId = getCurrentContactId();
+            List<Attendance_Log__c> matches = [
+                SELECT Id, Type__c, Late_Minutes__c, Employee__r.Name
+                FROM Attendance_Log__c
+                WHERE Id = :logId AND Employee__c = :contactId AND Status__c = 'Not Excused'
+                    AND Late_Minutes__c > 0 AND Appeal_Submitted__c = false
+                LIMIT 1
+            ];
+            if (matches.isEmpty()) {
+                throw new AuraHandledException('This record is not available for appeal.');
+            }
+
+            Attendance_Log__c logRec = new Attendance_Log__c(Id = matches[0].Id);
+            logRec.Status__c = 'Pending';
+            logRec.Excusal_Reason__c = reason;
+            logRec.Appeal_Submitted__c = true;
+            update logRec;
+            notifyAttendanceAppealReviewers(matches[0]);
+        } catch (AuraHandledException e) {
+            throw e;
+        } catch (Exception e) {
+            ErrorLogger.log(e);
+            AuraHandledException handledException = new AuraHandledException(
+                'Unable to submit the attendance appeal. Please try again or contact your administrator.'
+            );
+            handledException.setMessage(
+                'Unable to submit the attendance appeal. Please try again or contact your administrator.'
+            );
+            throw handledException;
         }
-
-        Attendance_Log__c logRec = new Attendance_Log__c(Id = matches[0].Id);
-        logRec.Status__c = 'Pending';
-        logRec.Excusal_Reason__c = reason;
-        logRec.Appeal_Submitted__c = true;
-        update logRec;
-        notifyAttendanceAppealReviewers(matches[0]);
     }
 
     private static void notifyAttendanceAppealReviewers(Attendance_Log__c appeal) {
@@ -331,7 +373,7 @@ public with sharing class AttendanceController {
             Messaging.CustomNotification notification = new Messaging.CustomNotification();
             notification.setTitle('New attendance appeal');
             notification.setBody(appeal.Employee__r.Name + ' submitted an appeal for ' + appeal.Type__c +
-                ' (' + appeal.Late_Minutes__c + ' minutes late).');
+                ' (' + formatLateDuration(appeal.Late_Minutes__c) + ' late).');
             notification.setNotificationTypeId(notificationTypes[0].Id);
             notification.setTargetId(appeal.Id);
             notification.send(notificationRecipientIds);
@@ -341,6 +383,23 @@ public with sharing class AttendanceController {
         }
     }
 
+    private static String formatLateDuration(Decimal lateMinutes) {
+        Integer totalMinutes = lateMinutes == null ? 0 : lateMinutes.intValue();
+        Integer hours = totalMinutes / 60;
+        Integer remainingMinutes = totalMinutes - (hours * 60);
+
+        if (hours == 0) {
+            return totalMinutes + (totalMinutes == 1 ? ' minute' : ' minutes');
+        }
+
+        String duration = hours + (hours == 1 ? ' hour' : ' hours');
+        if (remainingMinutes > 0) {
+            duration += ' ' + remainingMinutes +
+                (remainingMinutes == 1 ? ' minute' : ' minutes');
+        }
+        return duration;
+    }
+
     @AuraEnabled
     public static HistoryPageResult getHistory(Date startDate, Date endDate, Boolean lateOnly, Integer pageNumber) {
         Id contactId = getCurrentContactId();
@@ -348,32 +407,29 @@ public with sharing class AttendanceController {
         if (startDate == null || endDate == null) {
             throw new AuraHandledException('Start and end date are required.');
         }
-        Integer pageSize = 10;
-        Integer pageNum = pageNumber != null ? pageNumber : 0;
-        Integer offset = pageNum * pageSize;
+        HistoryPageResult result = new HistoryPageResult();
+        Integer pageSize = HISTORY_PAGE_SIZE;
+        result.pageSize = pageSize;
+        result.pageNumber = pageNumber != null ? pageNumber : 0;
+        Integer recordOffset = result.pageNumber * result.pageSize;
 
         String whereClause = 'WHERE Employee__c = :contactId ' +
-                            'AND Date__c >= :startDate AND Date__c <= :endDate ';
-        if (lateOnly) {
+            'AND Date__c >= :startDate AND Date__c <= :endDate ';
+        if (lateOnly == true) {
             whereClause += 'AND (Office_Late_Minutes__c > 0 OR Lunch_Late_Minutes__c > 0) ';
         }
 
-        Integer totalCount = Database.countQuery(
+        result.totalCount = Database.countQuery(
             'SELECT COUNT() FROM Attendance_Summary__c ' + whereClause
         );
-
-        String query = 'SELECT Id, Date__c, Office_Check_In_Time__c, Office_Check_Out_Time__c, ' +
-                        'Lunch_In_Time__c, Lunch_Out_Time__c, Office_Late_Minutes__c, ' +
-                        'Lunch_Late_Minutes__c, Total_Deduction_Amount__c, ' +
-                        '(SELECT Status__c FROM Attendance_Logs__r WHERE Late_Minutes__c > 0) ' +
-                        'FROM Attendance_Summary__c ' + whereClause +
-                        'ORDER BY Date__c DESC LIMIT :pageSize OFFSET :offset';
-
-        HistoryPageResult result = new HistoryPageResult();
-        result.records = Database.query(query);
-        result.totalCount = totalCount;
-        result.pageSize = pageSize;
-        result.pageNumber = pageNum;
+        result.records = Database.query(
+            'SELECT Id, Date__c, Office_Check_In_Time__c, Office_Check_Out_Time__c, ' +
+            'Lunch_In_Time__c, Lunch_Out_Time__c, Office_Late_Minutes__c, ' +
+            'Lunch_Late_Minutes__c, Total_Deduction_Amount__c, ' +
+            '(SELECT Status__c FROM Attendance_Logs__r WHERE Late_Minutes__c > 0) ' +
+            'FROM Attendance_Summary__c ' + whereClause +
+            'ORDER BY Date__c DESC LIMIT :pageSize OFFSET :recordOffset'
+        );
         return result;
     }
     
@@ -444,7 +500,7 @@ public with sharing class AttendanceController {
     }
 
     @TestVisible
-    private static Boolean shouldExcludeSaturday(Date attendanceDate) {
+    public static Boolean shouldExcludeSaturday(Date attendanceDate) {
         Boolean excludeSaturday = excludeSaturdayOverride;
         if (excludeSaturday == null) {
             List<Assessment_Portal_Config__mdt> configs = [
@@ -465,34 +521,22 @@ public with sharing class AttendanceController {
         return midnight.format('E') == 'Sat';
     }
 
+    @TestVisible
     private static Integer calculateLateMinutes(String punchType, Attendance_Config__mdt office,
-                                                 Attendance_Summary__c summary, Datetime eventTime) {
+                                                 Attendance_Summary__c summary, Datetime eventTime,
+                                                 Date attendanceDate) {
         Integer diffMinutes = 0;
 
         // Keep the attendance punch and timestamps, but do not treat it as late
         // (or let it trigger a deduction) when Saturday exclusion is configured.
-        if (shouldExcludeSaturday(Date.today())) {
+        if (shouldExcludeSaturday(attendanceDate)) {
             return 0;
         }
 
-        if (punchType == 'Office Check-In' && String.isNotBlank(office.Office_Start_Time__c)) {
-            try {
-                List<String> timeParts = office.Office_Start_Time__c.split(':');
-                Integer hour = timeParts.size() > 0 ? Integer.valueOf(timeParts[0]) : 0;
-                Integer minute = timeParts.size() > 1 ? Integer.valueOf(timeParts[1]) : 0;
-                Integer second = 0;
-                if (timeParts.size() > 2) {
-                    String secPart = timeParts[2].contains('.') ? timeParts[2].substringBefore('.') : timeParts[2];
-                    second = Integer.valueOf(secPart);
-                }
-                Datetime expectedStart = Datetime.newInstance(
-                    Date.today().year(), Date.today().month(), Date.today().day(), hour, minute, second
-                );
+        if (punchType == 'Office Check-In') {
+            Datetime expectedStart = getBusinessHoursOpeningDateTime(attendanceDate);
+            if (expectedStart != null) {
                 diffMinutes = Integer.valueOf((eventTime.getTime() - expectedStart.getTime()) / 60000);
-            } catch (Exception e) {
-                ErrorLogger.log(e);
-                // Malformed Office_Start_Time__c in metadata — fail safe to 0 rather than blocking check-in
-                diffMinutes = 0;
             }
 
         } else if (punchType == 'Lunch Check-Out' && summary.Lunch_In_Time__c != null
@@ -507,12 +551,139 @@ public with sharing class AttendanceController {
         return diffMinutes > 0 ? diffMinutes : 0;
     }
 
-    // Office arrival and late lunch share the first three distinct late dates in a
-    // calendar month. After that grace, each late event is charged independently.
+    private static Datetime getBusinessHoursOpeningDateTime(Date attendanceDate) {
+        if (attendanceDate == null) {
+            return null;
+        }
+
+        BusinessHours schedule = defaultBusinessHoursOverride;
+        if (schedule == null) {
+            List<BusinessHours> defaultHours = [
+                SELECT TimeZoneSidKey, MondayStartTime, TuesdayStartTime, WednesdayStartTime,
+                       ThursdayStartTime, FridayStartTime, SaturdayStartTime, SundayStartTime
+                FROM BusinessHours
+                WHERE IsDefault = true
+                LIMIT 1
+            ];
+            if (defaultHours.isEmpty()) {
+                return null;
+            }
+            schedule = defaultHours[0];
+        }
+
+        Integer weekday = Integer.valueOf(
+            Math.mod(Date.newInstance(1900, 1, 1).daysBetween(attendanceDate), 7)
+        );
+        Time openingTime;
+        switch on weekday {
+            when 0 { openingTime = schedule.MondayStartTime; }
+            when 1 { openingTime = schedule.TuesdayStartTime; }
+            when 2 { openingTime = schedule.WednesdayStartTime; }
+            when 3 { openingTime = schedule.ThursdayStartTime; }
+            when 4 { openingTime = schedule.FridayStartTime; }
+            when 5 { openingTime = schedule.SaturdayStartTime; }
+            when 6 { openingTime = schedule.SundayStartTime; }
+            when else { return null; }
+        }
+        if (openingTime == null || String.isBlank(schedule.TimeZoneSidKey)) {
+            return null;
+        }
+
+        Datetime wallTimeUtc = Datetime.newInstanceGmt(attendanceDate, openingTime);
+        TimeZone businessTimeZone = TimeZone.getTimeZone(schedule.TimeZoneSidKey);
+        Integer offsetMillis = businessTimeZone.getOffset(wallTimeUtc);
+        Datetime openingDateTime = wallTimeUtc.addSeconds((-offsetMillis) / 1000);
+        Integer adjustedOffsetMillis = businessTimeZone.getOffset(openingDateTime);
+        if (adjustedOffsetMillis != offsetMillis) {
+            openingDateTime = wallTimeUtc.addSeconds((-adjustedOffsetMillis) / 1000);
+        }
+        return openingDateTime;
+    }
+
     @TestVisible
-    private static Boolean isBeyondMonthlyLateGrace(Id employeeId, Date lateDate) {
+    private static Datetime getOfficeCheckInOpensAt(Date attendanceDate, Attendance_Config__mdt office) {
+        if (office == null || String.isBlank(office.Office_Start_Time__c)) {
+            return null;
+        }
+        return getOfficeStartDateTime(attendanceDate, office).addHours(-2);
+    }
+
+    private static Datetime getOfficeStartDateTime(Date attendanceDate, Attendance_Config__mdt office) {
+        List<String> timeParts = office.Office_Start_Time__c.split(':');
+        if (timeParts.size() < 2 || timeParts.size() > 3) {
+            throw new IllegalArgumentException('Office_Start_Time__c must use HH:mm or HH:mm:ss.');
+        }
+        Integer hour = Integer.valueOf(timeParts[0]);
+        Integer minute = Integer.valueOf(timeParts[1]);
+        Integer second = 0;
+        if (timeParts.size() == 3) {
+            String secPart = timeParts[2].contains('.') ? timeParts[2].substringBefore('.') : timeParts[2];
+            second = Integer.valueOf(secPart);
+        }
+        return Datetime.newInstance(
+            attendanceDate.year(), attendanceDate.month(), attendanceDate.day(),
+            hour, minute, second
+        );
+    }
+
+    @TestVisible
+    private static Boolean isOfficeCheckInOpen(Date attendanceDate, Attendance_Config__mdt office) {
+        Datetime opensAt = getOfficeCheckInOpensAt(attendanceDate, office);
+        return opensAt == null || (officeCheckInNowOverride != null
+            ? officeCheckInNowOverride >= opensAt
+            : System.now() >= opensAt);
+    }
+
+    private static Boolean isBeforeOfficeCheckInOpens(
+        Date attendanceDate,
+        Attendance_Config__mdt office
+    ) {
+        Datetime opensAt = getOfficeCheckInOpensAt(attendanceDate, office);
+        return opensAt != null && (officeCheckInNowOverride != null
+            ? officeCheckInNowOverride < opensAt
+            : System.now() < opensAt);
+    }
+
+    private static Datetime getNextOfficeCheckInOpensAt(
+        Date attendanceDate,
+        Attendance_Config__mdt office
+    ) {
+        Datetime nowValue = officeCheckInNowOverride != null
+            ? officeCheckInNowOverride
+            : System.now();
+        Datetime todayOpensAt = getOfficeCheckInOpensAt(attendanceDate, office);
+        Date nextOpeningDate = todayOpensAt != null && nowValue >= todayOpensAt
+            ? attendanceDate.addDays(1)
+            : attendanceDate;
+        return getOfficeCheckInOpensAt(nextOpeningDate, office);
+    }
+
+    private static List<Attendance_Log__c> getValidAttendanceLogs(Id contactId, Date attendanceDate) {
+        return [
+            SELECT Id, Type__c, Event_Timestamp__c, Status__c, Late_Minutes__c,
+                   Excusal_Reason__c, Deduction_Amount__c
+            FROM Attendance_Log__c
+            WHERE Employee__c = :contactId
+              AND Is_Valid__c = true
+              AND Attendance_Summary__r.Date__c = :attendanceDate
+            ORDER BY Event_Timestamp__c ASC
+        ];
+    }
+
+    private static Boolean containsPunchType(List<Attendance_Log__c> logs, String punchType) {
+        for (Attendance_Log__c logRec : logs) {
+            if (logRec.Type__c == punchType) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Office and lunch lateness each use their own first three monthly late occurrences.
+    @TestVisible
+    private static Boolean isBeyondMonthlyLateGrace(Id employeeId, Date lateDate, String punchType) {
         Date monthStart = lateDate.toStartOfMonth();
-        Set<Date> priorLateDates = new Set<Date>();
+        Integer priorLateOccurrences = 0;
 
         for (Attendance_Log__c lateLog : [
             SELECT Attendance_Summary__r.Date__c
@@ -520,6 +691,8 @@ public with sharing class AttendanceController {
             WHERE Employee__c = :employeeId
               AND Is_Valid__c = true
               AND Late_Minutes__c > 0
+              AND Type__c = :punchType
+              AND (Status__c = null OR Status__c != 'Excused')
               AND Attendance_Summary__r.Date__c >= :monthStart
               AND Attendance_Summary__r.Date__c <= :lateDate
         ]) {
@@ -527,12 +700,12 @@ public with sharing class AttendanceController {
             if (shouldExcludeSaturday(recordedLateDate)) {
                 continue;
             }
-            if (recordedLateDate != lateDate) {
-                priorLateDates.add(recordedLateDate);
+            if (recordedLateDate < lateDate) {
+                priorLateOccurrences++;
             }
         }
 
-        return priorLateDates.size() >= MONTHLY_LATE_GRACE_DAYS;
+        return priorLateOccurrences >= MONTHLY_LATE_GRACE_DAYS;
     }
 
     private static void attachPhoto(Id logRecordId, String base64Data, String contentType) {
@@ -555,6 +728,9 @@ public with sharing class AttendanceController {
     }
 
     private static Id getCurrentContactId() {
+        if (currentContactIdOverride != null) {
+            return currentContactIdOverride;
+        }
         User u = [SELECT ContactId FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1];
         if (u.ContactId == null) {
             throw new AuraHandledException('Current user is not linked to a Contact record.');
@@ -593,6 +769,28 @@ public with sharing class AttendanceController {
         return office.Need_Lunch_Photo__c == true;
     }
 
+    @TestVisible
+    private class AttendanceGeoUtils {
+        private final Double earthRadiusMeters = 6371000.0;
+
+        @TestVisible
+        private Double distanceMeters(Double lat1, Double lon1, Double lat2, Double lon2) {
+            Double dLat = toRadians(lat2 - lat1);
+            Double dLon = toRadians(lon2 - lon1);
+
+            Double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+            Double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return earthRadiusMeters * c;
+        }
+
+        private Double toRadians(Double degrees) {
+            return degrees * Math.PI / 180.0;
+        }
+    }
+
     // ---------- Wrapper classes ----------
 
     public class TodayRecord {
@@ -600,6 +798,8 @@ public with sharing class AttendanceController {
         @AuraEnabled public String buttonLabel;
         @AuraEnabled public Boolean isDone;
         @AuraEnabled public String message;
+        @AuraEnabled public Decimal lunchDurationMinutes;
+        @AuraEnabled public Datetime nextOfficeCheckInOpensAt;
         @AuraEnabled public List<PunchEntryDTO> entries = new List<PunchEntryDTO>();
     }
 
@@ -614,6 +814,7 @@ public with sharing class AttendanceController {
         @AuraEnabled public Decimal deductionAmount;
         @AuraEnabled public Boolean eligible;
         @AuraEnabled public Boolean needsPhoto;
+        @AuraEnabled public Datetime officeCheckInOpensAt;
     }
 
     public class PunchResult {

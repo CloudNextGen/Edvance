@@ -5,6 +5,7 @@ public with sharing class PortalRequestService {
     private static final String NOTIFICATION_TYPE_DEV_NAME = 'Task_Assigned_to_Queue';
     private static final String TYPE_HR = 'HR Related Query';
     private static final String TYPE_MANAGER = 'Manager Related Query';
+    private static final String LEARNING_ACCESS_REQUEST_SUBJECT_PREFIX = 'Learning access request:';
 
     private static final String STATUS_NEW = 'New';
     private static final String STATUS_WORKING = 'Working';
@@ -94,38 +95,77 @@ public with sharing class PortalRequestService {
         ];
     }
 
-    // Returns requests in the queues the current user belongs to,
-    // excluding requests raised by the current user's own Contact.
+    // Returns requests in the queues the current user belongs to, plus requests
+    // assigned directly to them, excluding requests raised by their own Contact.
     @AuraEnabled(cacheable=true)
     public static List<Case> getQueueRequests() {
-        Set<Id> queueIds = getMemberQueueIds(UserInfo.getUserId());
-        if (queueIds.isEmpty()) {
-            return new List<Case>();
-        }
-
+        Id userId = UserInfo.getUserId();
+        Set<Id> queueIds = getMemberQueueIds(userId);
+        queueIds.add(userId);
         Id myContactId = getCurrentContactId();
+        String learningRequestPrefix = LEARNING_ACCESS_REQUEST_SUBJECT_PREFIX + '%';
 
-        // User has no Contact (e.g. internal user): nothing to exclude
-        if (myContactId == null) {
-            return [
-                SELECT Id, Subject, Type, Status, CreatedDate, Description,
-                    Contact.Name, Contact.Id, Contact.Email
-                FROM Case
-                WHERE OwnerId IN :queueIds
-                WITH SYSTEM_MODE
-                ORDER BY CreatedDate DESC
-            ];
+        String query = 'SELECT Id, Subject, Type, Status, CreatedDate, Description, ' +
+            'Contact.Name, Contact.Id, Contact.Email ' +
+            'FROM Case WHERE (OwnerId IN :queueIds';
+        query += ')';
+
+        if (myContactId != null) {
+            query += ' AND (ContactId = null OR ContactId != :myContactId)';
         }
+        query += ' ORDER BY CreatedDate DESC';
+        Map<Id, Case> requestsById = new Map<Id, Case>();
+        for (Case request : Database.query(query, AccessLevel.SYSTEM_MODE)) {
+            requestsById.put(request.Id, request);
+        }
+        if (canAccessAssignedLearningRequests()) {
+            for (Case request : PortalRequestMentorAccess.getAssignedLearningRequests(
+                userId,
+                myContactId
+            )) {
+                requestsById.put(request.Id, request);
+            }
+        }
+        List<Case> requests = requestsById.values();
+        requests.sort(new RequestCreatedDateComparator());
+        return requests;
+    }
 
-        return [
+    private class RequestCreatedDateComparator implements Comparator<Case> {
+        public Integer compare(Case first, Case second) {
+            if (first.CreatedDate == second.CreatedDate) {
+                return 0;
+            }
+            return first.CreatedDate > second.CreatedDate ? -1 : 1;
+        }
+    }
+
+    @AuraEnabled
+    public static Case getRequestForReview(Id caseId) {
+        if (caseId == null) {
+            throw new AuraHandledException('Case ID is required.');
+        }
+        assertQueueAccess(caseId);
+
+        List<Case> requests = [
             SELECT Id, Subject, Type, Status, CreatedDate, Description,
                 Contact.Name, Contact.Id, Contact.Email
             FROM Case
-            WHERE OwnerId IN :queueIds
-            AND (ContactId = null OR ContactId != :myContactId)
+            WHERE Id = :caseId
             WITH SYSTEM_MODE
-            ORDER BY CreatedDate DESC
+            LIMIT 1
         ];
+        if (requests.isEmpty() && canAccessAssignedLearningRequests()) {
+            Case assignedRequest =
+                PortalRequestMentorAccess.getAssignedLearningRequest(caseId, UserInfo.getUserId());
+            if (assignedRequest != null) {
+                return assignedRequest;
+            }
+        }
+        if (requests.isEmpty()) {
+            throw new AuraHandledException('This request could not be found.');
+        }
+        return requests[0];
     }
 
     @AuraEnabled
@@ -142,11 +182,17 @@ public with sharing class PortalRequestService {
         try {
             assertQueueAccess(caseId);
 
-            Case c = new Case(
-                Id = caseId,
-                Status = newStatus
-            );
-            Database.update(c, true, AccessLevel.SYSTEM_MODE);
+            if (canAccessAssignedLearningRequests()
+                && PortalRequestMentorAccess.isAssignedLearningRequest(caseId, UserInfo.getUserId())) {
+                PortalRequestMentorAccess.updateAssignedLearningRequest(
+                    caseId,
+                    UserInfo.getUserId(),
+                    newStatus
+                );
+            } else {
+                Case c = new Case(Id = caseId, Status = newStatus);
+                Database.update(c, true, AccessLevel.SYSTEM_MODE);
+            }
         } catch (Exception e) {
             ErrorLogger.log(e);
             throw new AuraHandledException('Unable to update status: ' + e.getMessage());
@@ -160,13 +206,22 @@ public with sharing class PortalRequestService {
         }
         assertCaseAccess(caseId);
 
-        List<CaseComment> comments = [
-            SELECT Id, CommentBody, CreatedDate, CreatedBy.Name
-            FROM CaseComment
-            WHERE ParentId = :caseId AND IsPublished = true
-            WITH SYSTEM_MODE
-            ORDER BY CreatedDate ASC
-        ];
+        List<CaseComment> comments;
+        if (canAccessAssignedLearningRequests()
+            && PortalRequestMentorAccess.isAssignedLearningRequest(caseId, UserInfo.getUserId())) {
+            comments = PortalRequestMentorAccess.getAssignedLearningRequestComments(
+                caseId,
+                UserInfo.getUserId()
+            );
+        } else {
+            comments = [
+                SELECT Id, CommentBody, CreatedDate, CreatedBy.Name
+                FROM CaseComment
+                WHERE ParentId = :caseId AND IsPublished = true
+                WITH SYSTEM_MODE
+                ORDER BY CreatedDate ASC
+            ];
+        }
 
         List<CommentResult> results = new List<CommentResult>();
         for (CaseComment cc : comments) {
@@ -192,12 +247,21 @@ public with sharing class PortalRequestService {
         try {
             assertCaseAccess(caseId);
 
-            CaseComment cc = new CaseComment(
-                ParentId = caseId,
-                CommentBody = commentBody,
-                IsPublished = true
-            );
-            Database.insert(cc, true, AccessLevel.SYSTEM_MODE);
+            if (canAccessAssignedLearningRequests()
+                && PortalRequestMentorAccess.isAssignedLearningRequest(caseId, UserInfo.getUserId())) {
+                PortalRequestMentorAccess.addAssignedLearningComment(
+                    caseId,
+                    UserInfo.getUserId(),
+                    commentBody
+                );
+            } else {
+                CaseComment cc = new CaseComment(
+                    ParentId = caseId,
+                    CommentBody = commentBody,
+                    IsPublished = true
+                );
+                Database.insert(cc, true, AccessLevel.SYSTEM_MODE);
+            }
         } catch (Exception e) {
             ErrorLogger.log(e);
             throw new AuraHandledException('Unable to add comment: ' + e.getMessage());
@@ -221,21 +285,42 @@ public with sharing class PortalRequestService {
 
             // 1. Update Case Status only if provided
             if (String.isNotBlank(newStatus)) {
-                Case c = new Case(
-                    Id = caseId,
-                    Status = newStatus
-                );
-                Database.update(c, true, AccessLevel.SYSTEM_MODE);
+                if (canAccessAssignedLearningRequests()
+                    && PortalRequestMentorAccess.isAssignedLearningRequest(
+                        caseId,
+                        UserInfo.getUserId()
+                    )) {
+                    PortalRequestMentorAccess.updateAssignedLearningRequest(
+                        caseId,
+                        UserInfo.getUserId(),
+                        newStatus
+                    );
+                } else {
+                    Case c = new Case(Id = caseId, Status = newStatus);
+                    Database.update(c, true, AccessLevel.SYSTEM_MODE);
+                }
             }
 
             // 2. Insert Case Comment only if text was provided
             if (String.isNotBlank(commentBody) && String.isNotBlank(commentBody.trim())) {
-                CaseComment cc = new CaseComment(
-                    ParentId = caseId,
-                    CommentBody = commentBody.trim(),
-                    IsPublished = true
-                );
-                Database.insert(cc, true, AccessLevel.SYSTEM_MODE);
+                if (canAccessAssignedLearningRequests()
+                    && PortalRequestMentorAccess.isAssignedLearningRequest(
+                        caseId,
+                        UserInfo.getUserId()
+                    )) {
+                    PortalRequestMentorAccess.addAssignedLearningComment(
+                        caseId,
+                        UserInfo.getUserId(),
+                        commentBody.trim()
+                    );
+                } else {
+                    CaseComment cc = new CaseComment(
+                        ParentId = caseId,
+                        CommentBody = commentBody.trim(),
+                        IsPublished = true
+                    );
+                    Database.insert(cc, true, AccessLevel.SYSTEM_MODE);
+                }
             }
         } catch (Exception e) {
             ErrorLogger.log(e);
@@ -247,36 +332,143 @@ public with sharing class PortalRequestService {
 
     // ===== Access checks =====
     private static void assertCaseAccess(Id caseId) {
+        Id userId = UserInfo.getUserId();
         Id contactId = getCurrentContactId();
-        Set<Id> queueIds = getMemberQueueIds(UserInfo.getUserId());
-
-        String query = 'SELECT Id FROM Case WHERE Id = :caseId AND (OwnerId IN :queueIds';
-        if (contactId != null) {
-            query += ' OR ContactId = :contactId';
+        Set<Id> queueIds = getMemberQueueIds(userId);
+        List<Case> requests = [
+            SELECT Id, OwnerId, ContactId, Contact.Mentor__c, Type, Subject
+            FROM Case
+            WHERE Id = :caseId
+            WITH SYSTEM_MODE
+            LIMIT 1
+        ];
+        if (requests.isEmpty()) {
+            if (canAccessAssignedLearningRequests()
+                && PortalRequestMentorAccess.isAssignedLearningRequest(caseId, UserInfo.getUserId())) {
+                return;
+            }
+            throw new AuraHandledException('You do not have access to this request.');
         }
-        query += ')';
 
-        List<Case> matches = Database.query(query, AccessLevel.SYSTEM_MODE);
-        if (matches.isEmpty()) {
+        Case request = requests[0];
+        Boolean canAccessAsOwner = request.OwnerId == userId || queueIds.contains(request.OwnerId);
+        Boolean canAccessAsRequester = contactId != null && request.ContactId == contactId;
+        if (!canAccessAsOwner && !canAccessAsRequester &&
+            !isAssignedLearningRequestForUser(request, userId)) {
             throw new AuraHandledException('You do not have access to this request.');
         }
     }
 
-    // Queue members may work a case only if it is in their queue
-    // and was not raised by their own Contact.
+    // Request owners and queue members can work their cases; selected mentors can
+    // also work learning-access requests even when another user owns the Case.
     private static void assertQueueAccess(Id caseId) {
-        Set<Id> queueIds = getMemberQueueIds(UserInfo.getUserId());
+        Id userId = UserInfo.getUserId();
+        Set<Id> queueIds = getMemberQueueIds(userId);
         Id myContactId = getCurrentContactId();
-
-        String query = 'SELECT Id FROM Case WHERE Id = :caseId AND OwnerId IN :queueIds';
-        if (myContactId != null) {
-            query += ' AND (ContactId = null OR ContactId != :myContactId)';
-        }
-
-        List<Case> matches = Database.query(query, AccessLevel.SYSTEM_MODE);
-        if (matches.isEmpty()) {
+        List<Case> requests = [
+            SELECT Id, OwnerId, ContactId, Contact.Mentor__c, Type, Subject
+            FROM Case
+            WHERE Id = :caseId
+            WITH SYSTEM_MODE
+            LIMIT 1
+        ];
+        if (requests.isEmpty()) {
+            if (canAccessAssignedLearningRequests()
+                && PortalRequestMentorAccess.isAssignedLearningRequest(caseId, UserInfo.getUserId())) {
+                return;
+            }
             throw new AuraHandledException('You do not have access to update this request.');
         }
+
+        Case request = requests[0];
+        Boolean isNotMyOwnRequest = myContactId == null || request.ContactId != myContactId;
+        Boolean canAccessAsOwner = isNotMyOwnRequest &&
+            (request.OwnerId == userId || queueIds.contains(request.OwnerId));
+        if (!canAccessAsOwner && !isAssignedLearningRequestForUser(request, userId)) {
+            throw new AuraHandledException('You do not have access to update this request.');
+        }
+    }
+
+    private static Boolean isAssignedLearningRequestForUser(Case request, Id userId) {
+        if (!canAccessAssignedLearningRequests()
+            || request.ContactId == null
+            || request.Type != 'Other'
+            || request.Subject == null
+            || !request.Subject.startsWith(LEARNING_ACCESS_REQUEST_SUBJECT_PREFIX)) {
+            return false;
+        }
+        return PortalRequestMentorAccess.isAssignedLearningRequest(
+            request.Id,
+            userId
+        );
+    }
+
+    @TestVisible
+    private static Boolean canAccessAssignedLearningRequests() {
+        return LearningAccessAdminController.isSystemAdministrator()
+            || hasMentorPermissionSet(UserInfo.getUserId());
+    }
+
+    private static Boolean hasMentorPermissionSet(Id userId) {
+        List<User> users = [
+            SELECT Id, IsActive
+            FROM User
+            WHERE Id = :userId
+            WITH SYSTEM_MODE
+            LIMIT 1
+        ];
+        if (users.isEmpty() || !users[0].IsActive) {
+            return false;
+        }
+
+        List<PermissionSet> mentorPermissionSets = [
+            SELECT Id
+            FROM PermissionSet
+            WHERE Name = 'Portal_Mentor_permission_set'
+            WITH SYSTEM_MODE
+        ];
+        if (mentorPermissionSets.isEmpty()) {
+            return false;
+        }
+
+        Set<Id> mentorPermissionSetIds = new Set<Id>();
+        for (PermissionSet mentorPermissionSet : mentorPermissionSets) {
+            mentorPermissionSetIds.add(mentorPermissionSet.Id);
+        }
+        List<PermissionSetAssignment> directAssignments = [
+            SELECT Id
+            FROM PermissionSetAssignment
+            WHERE AssigneeId = :userId
+              AND PermissionSetId IN :mentorPermissionSetIds
+            WITH SYSTEM_MODE
+            LIMIT 1
+        ];
+        if (!directAssignments.isEmpty()) {
+            return true;
+        }
+
+        Set<Id> permissionSetGroupIds = new Set<Id>();
+        for (PermissionSetAssignment assignment : [
+            SELECT PermissionSetGroupId
+            FROM PermissionSetAssignment
+            WHERE AssigneeId = :userId
+              AND PermissionSetGroupId != null
+            WITH SYSTEM_MODE
+        ]) {
+            permissionSetGroupIds.add(assignment.PermissionSetGroupId);
+        }
+        if (permissionSetGroupIds.isEmpty()) {
+            return false;
+        }
+
+        return ![
+            SELECT Id
+            FROM PermissionSetGroupComponent
+            WHERE PermissionSetGroupId IN :permissionSetGroupIds
+              AND PermissionSetId IN :mentorPermissionSetIds
+            WITH SYSTEM_MODE
+            LIMIT 1
+        ].isEmpty();
     }
 
     // ===== Helpers =====

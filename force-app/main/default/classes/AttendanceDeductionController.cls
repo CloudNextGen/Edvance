@@ -200,38 +200,13 @@ public without sharing class AttendanceDeductionController {
                 employeeNameMap.put(c.Id, c.Name);
             }
 
-            // 7) Late Days counts within the filtered window
-            String offLateQuery = 
-                'SELECT Employee__c empId, COUNT(Id) totalDays ' +
-                'FROM Attendance_Summary__c ' +
-                'WHERE Employee__c IN :empIds AND Office_Late_Minutes__c > 0 ' +
-                attDateFilter +
-                saturdayFilter +
-                'WITH SYSTEM_MODE ' +
-                'GROUP BY Employee__c';
-
-            String lunchLateQuery = 
-                'SELECT Employee__c empId, COUNT(Id) totalDays ' +
-                'FROM Attendance_Summary__c ' +
-                'WHERE Employee__c IN :empIds AND Lunch_Late_Minutes__c > 0 ' +
-                attDateFilter +
-                saturdayFilter +
-                'WITH SYSTEM_MODE ' +
-                'GROUP BY Employee__c';
-
+            // 7) Late-day counts are accumulated from the date-window summary query below.
             Map<Id, Integer> officeLateDaysMap = new Map<Id, Integer>();
             Map<Id, Integer> lunchLateDaysMap = new Map<Id, Integer>();
 
-            for (AggregateResult a : (List<AggregateResult>) Database.query(offLateQuery)) {
-                officeLateDaysMap.put((Id) a.get('empId'), (Integer) a.get('totalDays'));
-            }
-            for (AggregateResult a : (List<AggregateResult>) Database.query(lunchLateQuery)) {
-                lunchLateDaysMap.put((Id) a.get('empId'), (Integer) a.get('totalDays'));
-            }
-
-            // 8) Latest summary date within the filtered window
+            // 8) Latest summary and late-day counts within the filtered window
             String latestRecQuery = 
-                'SELECT Id, Employee__c, Date__c ' +
+                'SELECT Id, Employee__c, Date__c, Office_Late_Minutes__c, Lunch_Late_Minutes__c ' +
                 'FROM Attendance_Summary__c ' +
                 'WHERE Employee__c IN :empIds ' +
                 attDateFilter +
@@ -241,6 +216,18 @@ public without sharing class AttendanceDeductionController {
 
             Map<Id, Attendance_Summary__c> latestRecordMap = new Map<Id, Attendance_Summary__c>();
             for (Attendance_Summary__c rec : (List<Attendance_Summary__c>) Database.query(latestRecQuery)) {
+                if (rec.Office_Late_Minutes__c != null && rec.Office_Late_Minutes__c > 0) {
+                    Integer officeLateDays = officeLateDaysMap.containsKey(rec.Employee__c)
+                        ? officeLateDaysMap.get(rec.Employee__c)
+                        : 0;
+                    officeLateDaysMap.put(rec.Employee__c, officeLateDays + 1);
+                }
+                if (rec.Lunch_Late_Minutes__c != null && rec.Lunch_Late_Minutes__c > 0) {
+                    Integer lunchLateDays = lunchLateDaysMap.containsKey(rec.Employee__c)
+                        ? lunchLateDaysMap.get(rec.Employee__c)
+                        : 0;
+                    lunchLateDaysMap.put(rec.Employee__c, lunchLateDays + 1);
+                }
                 if (!latestRecordMap.containsKey(rec.Employee__c)) {
                     latestRecordMap.put(rec.Employee__c, rec);
                 }
@@ -258,7 +245,7 @@ public without sharing class AttendanceDeductionController {
                 }
             }
         } catch (Exception e) {
-            System.debug(LoggingLevel.ERROR, 'AttendanceDeductionController.getTopDeductionsEmployees failed: ' + e.getMessage());
+            ErrorLogger.log(e);
             throw new AuraHandledException(e.getMessage());
         }
 
@@ -327,7 +314,7 @@ public without sharing class AttendanceDeductionController {
         } catch (AuraHandledException e) {
             throw e;
         } catch (Exception e) {
-            System.debug(LoggingLevel.ERROR, 'AttendanceDeductionController.redeemDeduction failed: ' + e.getMessage());
+            ErrorLogger.log(e);
             throw new AuraHandledException(e.getMessage());
         }
     }

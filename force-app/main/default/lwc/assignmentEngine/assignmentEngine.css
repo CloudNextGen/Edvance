@@ -217,6 +217,21 @@
     margin-bottom: 3.5rem;
 }
 
+.category-access-warning {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    background: #FFF8E1;
+    border: 1px solid #F2D58A;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    color: #805B12;
+    font-size: 0.9rem;
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
 .cat-card {
     background: var(--white);
     border: 1px solid var(--line);

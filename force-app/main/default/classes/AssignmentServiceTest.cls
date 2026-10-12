@@ -203,6 +203,138 @@ private class AssignmentServiceTest {
     }
 
     @isTest
+    static void testPassedAssignmentCanRequestNextAssignmentAccess() {
+        User portalUser = getPortalUser();
+        Contact learner = [SELECT Id FROM Contact WHERE Email = 'testportaluser@example.com' LIMIT 1];
+        Assignment_Eligibility__c eligibility = [
+            SELECT Id, Assignment__c
+            FROM Assignment_Eligibility__c
+            WHERE Contact__c = :learner.Id
+            LIMIT 1
+        ];
+        Assignment__c completedAssignment = [
+            SELECT Id, Category__c
+            FROM Assignment__c
+            WHERE Id = :eligibility.Assignment__c
+            LIMIT 1
+        ];
+        Assignment__c nextAssignment = [
+            SELECT Id
+            FROM Assignment__c
+            WHERE Sequence__c = 2
+            LIMIT 1
+        ];
+        Assessment_Portal_Config__mdt config = [
+            SELECT Auto_Create_Assignment_Eligibility__c
+            FROM Assessment_Portal_Config__mdt
+            LIMIT 1
+        ];
+        Assert.isFalse(
+            config.Auto_Create_Assignment_Eligibility__c,
+            'This test verifies the manual assignment access request flow.'
+        );
+
+        learner.Mentor__c = portalUser.Id;
+        update learner;
+        eligibility.Eligibility_Status__c = 'Completed';
+        update eligibility;
+
+        User_Submission__c passedSubmission = new User_Submission__c(
+            Name = 'Passed Assignment',
+            Assignment_Eligibility__c = eligibility.Id,
+            Attempt_Number__c = 1,
+            Status__c = 'Graded',
+            Max_Score__c = 20
+        );
+        insert passedSubmission;
+        List<Assignment_Question__c> questions = [
+            SELECT Id, Question_Text__c
+            FROM Assignment_Question__c
+            WHERE Assignment__c = :completedAssignment.Id
+        ];
+        List<Question_Response__c> passedResponses = new List<Question_Response__c>();
+        for (Assignment_Question__c question : questions) {
+            passedResponses.add(new Question_Response__c(
+                Name = question.Question_Text__c,
+                User_Submission__c = passedSubmission.Id,
+                Assignment_Question__c = question.Id,
+                User_Answer__c = 'Test answer',
+                AI_Grade__c = 10
+            ));
+        }
+        insert passedResponses;
+
+        System.runAs(portalUser) {
+            Test.startTest();
+            List<Map<String, Object>> assignments =
+                AssignmentService.getAssignmentsForCategory(completedAssignment.Category__c);
+            Map<String, Object> requestResult =
+                AssignmentService.requestNextAssignmentAccess(nextAssignment.Id);
+            Test.stopTest();
+
+            Assert.areEqual(2, assignments.size(), 'The passed learner should see the next assignment request row.');
+            Assert.areEqual('Completed', assignments[0].get('status'));
+            Assert.areEqual('RequestAccess', assignments[1].get('status'));
+            Assert.areEqual(true, requestResult.get('success'));
+        }
+
+        Case request = [
+            SELECT Id, ContactId, OwnerId, Subject, Status
+            FROM Case
+            WHERE ContactId = :learner.Id
+              AND Subject = 'Assignment Access Request: LWC Advanced'
+            LIMIT 1
+        ];
+        Group reviewQueue = [
+            SELECT Id
+            FROM Group
+            WHERE Type = 'Queue' AND DeveloperName = 'Learning_File_Review_Queue'
+            LIMIT 1
+        ];
+        Assert.areEqual(learner.Id, request.ContactId);
+        Assert.areEqual(reviewQueue.Id, request.OwnerId);
+        Assert.areEqual('New', request.Status);
+    }
+
+    @isTest
+    static void testFailedAssignmentDoesNotShowNextAssignmentRequest() {
+        User portalUser = getPortalUser();
+        Contact learner = [SELECT Id FROM Contact WHERE Email = 'testportaluser@example.com' LIMIT 1];
+        Assignment_Eligibility__c eligibility = [
+            SELECT Id, Assignment__c
+            FROM Assignment_Eligibility__c
+            WHERE Contact__c = :learner.Id
+            LIMIT 1
+        ];
+        Assignment__c completedAssignment = [
+            SELECT Id, Category__c
+            FROM Assignment__c
+            WHERE Id = :eligibility.Assignment__c
+            LIMIT 1
+        ];
+        eligibility.Eligibility_Status__c = 'Completed';
+        update eligibility;
+        insert new User_Submission__c(
+            Name = 'Failed Assignment',
+            Assignment_Eligibility__c = eligibility.Id,
+            Attempt_Number__c = 1,
+            Status__c = 'Graded',
+            Max_Score__c = 20
+        );
+
+        System.runAs(portalUser) {
+            Test.startTest();
+            List<Map<String, Object>> assignments =
+                AssignmentService.getAssignmentsForCategory(completedAssignment.Category__c);
+            Test.stopTest();
+
+            Assert.areEqual(1, assignments.size(), 'A failed learner must not see a request button for the next assignment.');
+            Assert.areEqual('Completed', assignments[0].get('status'));
+            Assert.areEqual(false, assignments[0].get('isRequestAccessStatus'));
+        }
+    }
+
+    @isTest
     static void testSubmitAssignment_NoEligibilityException() {
         User portalUser = getPortalUser();
         Assignment__c asm2 = [SELECT Id FROM Assignment__c WHERE Sequence__c = 2 LIMIT 1];

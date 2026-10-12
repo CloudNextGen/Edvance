@@ -46,8 +46,35 @@
 }
 
 .refresh-btn {
-    padding: 0.4rem 0.85rem;
-    font-size: 0.78rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    min-height: 2.5rem;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 1.25rem;
+    line-height: 1;
+    flex: 0 0 2.5rem;
+}
+
+.refresh-icon {
+    display: block;
+    line-height: 1;
+}
+
+.refresh-spinner {
+    width: 0.85rem;
+    height: 0.85rem;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: refresh-spin 0.7s linear infinite;
+}
+
+@keyframes refresh-spin {
+    to { transform: rotate(360deg); }
 }
 
 .eyebrow {

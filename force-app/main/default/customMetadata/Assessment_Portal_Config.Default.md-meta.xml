@@ -19,6 +19,10 @@
         <value xsi:type="xsd:boolean">false</value>
     </values>
     <values>
+        <field>Enforce_Team_Member_Access_Window__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+    <values>
         <field>Exclude_Saturday__c</field>
         <value xsi:type="xsd:boolean">false</value>
     </values>

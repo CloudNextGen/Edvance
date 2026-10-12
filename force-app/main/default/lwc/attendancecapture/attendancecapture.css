@@ -28,6 +28,27 @@
     padding: 2.5rem 0;
 }
 
+.location-status {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0 0 1rem;
+    padding: 0.8rem 1rem;
+    border: 1px solid #DCD3FA;
+    border-radius: 12px;
+    background: #F8F6FF;
+    color: var(--primary-dark);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.location-status lightning-spinner {
+    position: relative;
+    display: inline-block;
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
 /* ============ Action card ============ */
 .action-card {
     background: linear-gradient(135deg, #E4DBFF 0%, #F0EBFF 60%, #F8F6FF 100%);
@@ -129,6 +150,7 @@
 }
 
 .kpi-card {
+    position: relative;
     background: #fff;
     border: 1px solid var(--border);
     border-radius: 12px;
@@ -150,6 +172,15 @@
     color: var(--ink);
     margin-top: 0.25rem;
     display: block;
+}
+.kpi-breakdown {
+    position: absolute;
+    right: 1.2rem;
+    bottom: 1rem;
+    color: var(--ink);
+    font-size: 0.68rem;
+    font-weight: 600;
+    white-space: nowrap;
 }
 
 /* ============ Alerts ============ */
@@ -240,6 +271,27 @@
     font-size: 0.8rem;
     color: var(--ink-soft);
     margin: 0.1rem 0 0 0;
+}
+
+.lunch-countdown {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0.4rem 0 0;
+    padding: 0.25rem 0.55rem;
+    border: 1px solid #b7ead8;
+    border-radius: 999px;
+    background: #effbf6;
+    color: #087a55;
+    font-size: 0.72rem;
+    font-weight: 600;
+}
+
+.lunch-countdown strong {
+    font-variant-numeric: tabular-nums;
+    font-size: 0.78rem;
+    font-weight: 750;
+    letter-spacing: 0.025em;
 }
 
 .punch-row__right {

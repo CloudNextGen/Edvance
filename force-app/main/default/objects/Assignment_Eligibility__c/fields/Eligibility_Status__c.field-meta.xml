@@ -16,6 +16,11 @@
                 <label>Locked</label>
             </value>
             <value>
+                <fullName>Revoked</fullName>
+                <default>false</default>
+                <label>Revoked</label>
+            </value>
+            <value>
                 <fullName>Eligible</fullName>
                 <default>false</default>
                 <label>Eligible</label>

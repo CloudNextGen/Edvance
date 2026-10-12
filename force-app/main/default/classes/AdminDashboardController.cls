@@ -181,9 +181,9 @@ public without sharing class AdminDashboardController {
             asmMap.put('Name', asm.Name);
             asmMap.put('Total_Question_Count__c', asm.Total_Question_Count__c);
 
-            String rawStatus = 'Locked';
-            if (statusByAssignmentId.containsKey(asm.Id)) {
-                rawStatus = statusByAssignmentId.get(asm.Id);
+            String rawStatus = statusByAssignmentId.get(asm.Id);
+            if (rawStatus == null || rawStatus == 'Revoked') {
+                rawStatus = 'Locked';
             }
             
             asmMap.put('status', rawStatus);
